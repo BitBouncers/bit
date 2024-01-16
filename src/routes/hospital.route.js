@@ -1,8 +1,11 @@
-import express from "express";
-import { hospitalController } from "../controllers/index.js";
+import { hospitalService } from "../services/index";
 
-const router = express.Router();
+const hospitalRoutes = (fastify, opts, done) => {
+  fastify.get("/hospitals", hospitalService.hospitals);
 
-router.get("/hospitals", [], hospitalController.hospitals);
+  fastify.log.info("routes/hospital registered")
 
-export default router;
+  done();
+};
+
+export default hospitalRoutes;
