@@ -4,6 +4,7 @@ import { PORT } from "./utils/environment";
 
 const options: FastifyListenOptions = {
   port: PORT,
+  host: "0.0.0.0",
 };
 
 app.listen(options, (error: Error | null) => {
