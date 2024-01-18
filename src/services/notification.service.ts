@@ -1,4 +1,4 @@
-import { notification } from "../../drizzle/schema";
+import { notification } from "drizzle/schema";
 import db from "../config/db";
 
 export async function notify(

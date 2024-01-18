@@ -18,3 +18,5 @@ export const STRIPE_WEBHOOK_SECRET_KEY = process.env.STRIPE_WEBHOOK_SECRET_KEY;
 
 export const NODE_ENV = process.env.NODE_ENV;
 export const PORT = parseInt(process.env.PORT ?? "3000", 10);
+
+export const API_VERSION = process.env.API_VERSION;
