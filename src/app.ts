@@ -3,7 +3,7 @@ import cors from "@fastify/cors";
 import middie from "@fastify/middie";
 import Fastify from "fastify";
 import { join } from "path";
-import { NODE_ENV } from "./utils/environment";
+import { API_VERSION, NODE_ENV } from "./utils/environment";
 
 const dirname = process.cwd() + "/src";
 
@@ -22,8 +22,9 @@ const fastifyApp = Fastify({ logger: NODE_ENV !== "production" });
 fastifyApp.register(middie);
 fastifyApp.register(cors, corsOptions);
 
-fastifyApp.get("/", (_req, res) => {
-  res.send(`You've reached RadiologyArchive's ${WHICH_API} API!`);
+fastifyApp.get("/", (_request, reply) => {
+  API_VERSION && reply.header("Api-Version", API_VERSION);
+  reply.send(`You've reached RadiologyArchive's ${WHICH_API} API!`);
 });
 
 fastifyApp.register(autoLoad, {
