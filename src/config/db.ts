@@ -1,17 +1,38 @@
 import { connect } from "@planetscale/database";
-import { drizzle } from "drizzle-orm/planetscale-serverless";
-import { DATABASE_URL } from "../utils/environment";
+import {
+  PlanetScaleDatabase,
+  drizzle,
+} from "drizzle-orm/planetscale-serverless";
+import { FastifyPluginAsync } from "fastify";
+import fp from "fastify-plugin";
 
-if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
+declare module "fastify" {
+  interface FastifyInstance {
+    db: PlanetScaleDatabase;
+  }
 }
 
-const connection = {
-  url: DATABASE_URL,
+export interface DrizzlePluginOptions {
+  url: string;
+}
+
+const drizzlePlugin: FastifyPluginAsync<DrizzlePluginOptions> = async (
+  fastify,
+  opts
+) => {
+  if (!opts.url) {
+    fastify.log.error(
+      "DrizzlePluginOptions.url is required. Please provide a database url."
+    );
+    fastify.close();
+  }
+
+  const dbConn = connect(opts);
+  const db = drizzle(dbConn);
+
+  fastify.decorate("db", db);
+
+  fastify.log.info("Drizzle plugin registered.");
 };
 
-const dbConn = connect(connection);
-
-const db = drizzle(dbConn);
-
-export default db;
+export default fp(drizzlePlugin);

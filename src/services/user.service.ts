@@ -1,13 +1,9 @@
-import { eq, sql } from "drizzle-orm";
-import { rating, staffCredentials, user } from "../../drizzle/schema";
-import db from "../config/db";
 // import crypto from "crypto";
 /* import {
   adminAuth,
   auth,
   signInWithEmailAndPassword,
 } from "../config/firebase"; */
-import { FastifyReply, FastifyRequest } from "fastify";
 
 /* export async function assignRadiologist(req, res) {
   await dbConn
@@ -224,78 +220,6 @@ import { FastifyReply, FastifyRequest } from "fastify";
   res.json({ profile: results[0].rows[0], staff: results[1].rows });
 } */
 
-export async function meetOurRadiologists(
-  _request: FastifyRequest,
-  reply: FastifyReply
-) {
-  const radiologists = await db
-    .select({
-      uid: user.uid,
-      title: user.title,
-      first_name: user.firstName,
-      last_name: user.lastName,
-      profile_image_url: user.profileImageUrl,
-      expertise: staffCredentials.expertise,
-    })
-    .from(user)
-    .leftJoin(staffCredentials, eq(user.uid, staffCredentials.uid))
-    .where(eq(user.role, "RADIOLOGIST"))
-    .catch((error: unknown) => {
-      console.log("user.service.meetOurRadiologists: ", error);
-      return reply.send({ radiologists: [] });
-    });
-
-  if (!radiologists) {
-    return reply.send({ radiologists: [] });
-  }
-
-  reply.send(radiologists);
-}
-
-export async function radiologists(_: FastifyRequest, reply: FastifyReply) {
-  const result = await db.execute(
-    sql`\
-      SELECT \
-        U.uid, U.title, U.first_name, U.last_name, U.email, U.profile_image_url, \
-        SC.bio, SC.expertise, SC.years_of_exp, \
-        AVG() as average_rating \
-      FROM User U \
-      LEFT JOIN \
-        StaffCredentials SC ON U.uid = SC.uid \
-      LEFT JOIN \
-        Rating R ON U.uid = R.rated_uid \
-      WHERE U.role = 'RADIOLOGIST' \
-      GROUP BY \
-        U.uid, U.title, U.first_name, U.last_name, U.email, U.profile_image_url, \
-        SC.bio, SC.expertise, SC.years_of_exp`
-  );
-
-  const radiologists = await db
-    .select({
-      uid: user.uid,
-      title: user.title,
-      first_name: user.firstName,
-      last_name: user.lastName,
-      email: user.email,
-      profile_image_url: user.profileImageUrl,
-      bio: staffCredentials.bio,
-      expertise: staffCredentials.expertise,
-      years_of_exp: staffCredentials.yearsOfExp,
-      average_rating: rating.rating,
-    })
-    .from(user)
-    .leftJoin(staffCredentials, eq(user.uid, staffCredentials.uid))
-    .leftJoin(rating, eq(user.uid, rating.userUid))
-    .where(eq(user.role, "RADIOLOGIST"));
-
-  /* .catch((error) => {
-    console.log("user.service.radiologists: ", error);
-    reply.send({ radiologists: [] });
-  }); */
-
-  reply.send({ radiologists });
-}
-
 /* export async function uploadImage(req, res) {
   try {
     const uuid = crypto.randomUUID();
@@ -459,3 +383,5 @@ export async function radiologists(_: FastifyRequest, reply: FastifyReply) {
       ) AS authors_subquery ON I.uid = authors_subquery.image_uid \
       WHERE PR.staff_uid = ? \
       GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url"; */
+
+export {};

@@ -3,7 +3,8 @@ import cors from "@fastify/cors";
 import middie from "@fastify/middie";
 import Fastify from "fastify";
 import { join } from "path";
-import { API_VERSION, NODE_ENV } from "./utils/environment";
+import drizzlePlugin from "./config/db";
+import { API_VERSION, DATABASE_URL, NODE_ENV } from "./utils/environment";
 
 const dirname = process.cwd() + "/src";
 
@@ -17,19 +18,34 @@ const corsOptions = {
   preflightContinue: true,
 };
 
-const fastifyApp = Fastify({ logger: NODE_ENV !== "production" });
+const buildFastify = (opts?: { log?: boolean }) => {
+  if (!DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
 
-fastifyApp.register(middie);
-fastifyApp.register(cors, corsOptions);
+  const fastifyApp = Fastify({
+    logger: opts?.log ?? NODE_ENV !== "production",
+  });
 
-fastifyApp.get("/", (_request, reply) => {
-  API_VERSION && reply.header("Api-Version", API_VERSION);
-  reply.send(`You've reached RadiologyArchive's ${WHICH_API} API!`);
-});
+  fastifyApp.addHook("onRoute", async (route) => {
+    fastifyApp.log.info(route.method + " " + route.url);
+  });
 
-fastifyApp.register(autoLoad, {
-  dir: join(dirname, "routes"),
-  options: { prefix: "/api" },
-});
+  fastifyApp.register(middie);
+  fastifyApp.register(cors, corsOptions);
+  fastifyApp.register(drizzlePlugin, { url: DATABASE_URL });
 
-export default fastifyApp;
+  fastifyApp.get("/", (_request, reply) => {
+    API_VERSION && reply.header("Api-Version", API_VERSION);
+    reply.send(`You've reached RadiologyArchive's ${WHICH_API} API!`);
+  });
+
+  fastifyApp.register(autoLoad, {
+    dir: join(dirname, "routes"),
+    options: { prefix: "/api" },
+  });
+
+  return fastifyApp;
+};
+
+export default buildFastify;

@@ -1,6 +1,27 @@
 import { app, compareArrayOfObjects } from "../helper";
 
 describe("user route", () => {
+  test("second opinion radiologists", async () => {
+    const response = await app.inject({
+      url: "/api/user/radiologists",
+    });
+    expect(response.json().radiologists.length).toBeGreaterThan(0);
+    expect(Object.keys(response.json().radiologists[0])).toEqual(
+      expect.arrayContaining([
+        "uid",
+        "title",
+        "first_name",
+        "last_name",
+        "email",
+        "profile_image_url",
+        "bio",
+        "expertise",
+        "years_of_exp",
+        "average_rating",
+      ])
+    );
+  });
+
   test("meet our radiologists", async () => {
     const radiologists = [
       {

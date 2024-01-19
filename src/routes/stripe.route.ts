@@ -116,8 +116,6 @@ const stripeRoutes: FastifyPluginCallback = (fastify, _, done) => {
     reply.send();
   });
 
-  fastify.log.info("routes/stripe webhook registered");
-
   done();
 };
 

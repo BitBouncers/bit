@@ -5,7 +5,7 @@ import {
 } from "fastify";
 
 const authRoutes: FastifyPluginCallback = (
-  fastify: FastifyInstance,
+  _fastify: FastifyInstance,
   _opts: RegisterOptions,
   done
 ) => {
@@ -15,8 +15,6 @@ const authRoutes: FastifyPluginCallback = (
   // fastify.post( "/reset-password", [sendResetPasswordSchema, errors], authService.sendResetPassword);
   // fastify.post("/signup", [signupSchema, errors], authService.signup);
   // fastify.get("/token", [isAuthenticated], authService.token);
-
-  fastify.log.info("routes/auth registered");
 
   done();
 };

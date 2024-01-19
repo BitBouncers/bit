@@ -1,13 +1,10 @@
-import { notification } from "drizzle/schema";
-import db from "../config/db";
-
 export async function notify(
   receipient: string,
   senderUid: string,
   message: string,
   to?: string
 ) {
-  try {
+  /* try {
     const now = new Date().toISOString();
     return db
       .insert(notification)
@@ -21,15 +18,15 @@ export async function notify(
       })
       .execute();
 
-    /* const { rows } = await db.execute(
+    const { rows } = await db.execute(
       "INSERT INTO \
         Notification (recipient_uid, sender_uid, message, createdAt, timestamp, `to`) \
         VALUES (?, ?, ?, ?, ?, ?)",
       [receipient, sender, message, now, now, to]
-    ); */
+    );
   } catch (error) {
     console.log("notification.service.notify: ", error);
-  }
+  } */
 }
 
 /* export async function polling(request, reply) {

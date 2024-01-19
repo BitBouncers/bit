@@ -1,10 +1,10 @@
 import { FastifyInstance } from "fastify";
-import realApp from "../src/app";
+import buildFastify from "../src/app";
 
 type CompareArraysOfObjects<T> = (arr1: T[], arr2: T[]) => boolean;
 
-const buildLiveApp = () => {
-  const server: FastifyInstance = realApp;
+const buildLiveApp = async (opts: { log: boolean }) => {
+  const server: FastifyInstance = await buildFastify(opts);
 
   beforeAll(async () => {
     await server.ready();
@@ -26,4 +26,6 @@ const compareArrayOfObjects: CompareArraysOfObjects<any> = (a, b) => {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 };
 
-export { realApp as app, buildLiveApp, compareArrayOfObjects };
+const testApp = buildFastify({ log: false });
+
+export { testApp as app, buildLiveApp, compareArrayOfObjects };

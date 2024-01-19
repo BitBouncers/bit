@@ -46,8 +46,6 @@ const paymentRoutes: FastifyPluginCallback = (
     paymentService.voidInvoice
   );
 
-  fastify.log.info("routes/payment registered");
-
   done();
 };
 
