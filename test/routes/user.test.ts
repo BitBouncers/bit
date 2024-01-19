@@ -1,9 +1,7 @@
-import supertest from "supertest";
 import { app, compareArrayOfObjects } from "../helper";
 
 describe("user route", () => {
   test("meet our radiologists", async () => {
-    await app.ready();
     const radiologists = [
       {
         uid: "464xIBql69bqrg8F1BhzHDHtHsw1",
@@ -55,9 +53,9 @@ describe("user route", () => {
       },
     ];
 
-    const response = await supertest(app.server).get(
-      "/api/user/meet-our-radiologists"
-    );
-    expect(compareArrayOfObjects(response.body, radiologists)).toBe(true);
+    const response = await app.inject({
+      url: "/api/user/meet-our-radiologists",
+    });
+    expect(compareArrayOfObjects(response.json(), radiologists)).toBe(true);
   });
 });
