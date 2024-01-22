@@ -1,3 +1,4 @@
+import { PlanetScaleDatabase } from "drizzle-orm/planetscale-serverless";
 import "fastify";
 
 declare module "fastify" {
