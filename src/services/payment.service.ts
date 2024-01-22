@@ -113,3 +113,7 @@
 //       });
 //     });
 // }
+//
+interface IPaymentService {}
+
+export default class PaymentService implements IPaymentService {}
