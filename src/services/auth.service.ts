@@ -1,3 +1,6 @@
+import { FirebaseError } from "firebase/app";
+import { login } from "src/config/firebase";
+
 /* export async function addPatient(request, reply) {
   const { email, dob, first_name, last_name, title } = request.body;
 
@@ -95,34 +98,7 @@
   }
 } */
 
-/* export async function login(request, reply) {
-  const { email, password } = request.body;
-  await signInWithEmailAndPassword(auth, email, password)
-    .then((userCredential) => {
-      const user = userCredential._tokenResponse;
-      console.log("Successfully logged in:", user.localId);
-      // Attributes that are not needed for the client, but are returned by the Firebase API
-      const { kind, verified, email, registered, ...sanitizedUser } = user;
-      reply.status(200).send(sanitizedUser);
-    })
-    .catch((error) => {
-      console.log("Error logging in:", error.code);
-      if (error.code === "auth/invalid-login-credentials") {
-        reply.status(409).send({
-          errors: [
-            {
-              msg: "The email or password is incorrect",
-              path: "auth",
-            },
-          ],
-        });
-      } else {
-        reply
-          .status(409)
-          .send({ errors: [{ msg: error.message, path: "auth/signin" }] });
-      }
-    });
-} */
+import { FastifyReply, FastifyRequest } from "fastify";
 
 /* export async function portal(request, reply) {
   const { role } = request.params;
@@ -233,4 +209,29 @@
   }
 } */
 
-export {};
+interface IAuthService {
+  loginThroughFirebase: (
+    request: FastifyRequest<{ Body: { email: string; password: string } }>,
+    reply: FastifyReply
+  ) => Promise<FirebaseError | bit.AuthLoginResponse | undefined>;
+}
+
+export default class AuthService implements IAuthService {
+  loginThroughFirebase = async (
+    request: FastifyRequest<{ Body: { email: string; password: string } }>,
+    reply: FastifyReply
+  ) => {
+    const { email, password } = request.body;
+    const res = await login(email, password);
+
+    if (res instanceof FirebaseError) {
+      const r = { errors: [{ msg: res.message, path: "auth/login" }] };
+      if (res.code === "auth/invalid-credential") {
+        r.errors[0].msg = "The email or password you entered is incorrect.";
+      }
+      return reply.code(409).send(r);
+    }
+
+    reply.send(res);
+  };
+}

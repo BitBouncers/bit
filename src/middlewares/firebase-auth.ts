@@ -1,28 +1,44 @@
-/* import { adminAuth } from "../config/firebase.js";
+import { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from "fastify";
+import { FirebaseError } from "firebase/app";
+import { adminAuth } from "src/config/firebase";
 
-function getAuthToken(req, _res, next) {
+export const isAuthenticated = (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  done: HookHandlerDoneFunction
+) => {
   if (
-    req.headers.authorization &&
-    req.headers.authorization.split(" ")[0] === "Bearer"
+    request.headers?.authorization &&
+    request.headers.authorization.split(" ")[0] === "Bearer"
   ) {
-    req.authToken = req.headers.authorization.split(" ")[1];
-  }
-  next();
-}
-
-export function isAuthenticated(req, res, next) {
-  getAuthToken(req, res, async () => {
-    try {
-      const userInfo = await adminAuth.verifyIdToken(req.authToken);
-      if (userInfo.uid) {
-        req.userUID = userInfo.uid;
-        next();
-      }
-    } catch (error) {
-      console.log(error.code, error.message);
-      res
-        .status(401)
-        .send({ error: "You are not authorized to make this request." });
+    const authToken = request.headers.authorization.split(" ")[1];
+    if (!authToken) {
+      return reply.code(401).send({ error: "Missing bearer token." });
     }
-  });
-} */
+
+    adminAuth
+      .verifyIdToken(authToken)
+      .then((decodedToken) => {
+        if (decodedToken.uid) {
+          request.userUID = decodedToken.uid;
+        }
+        done();
+      })
+      .catch((error: unknown) => {
+        if (
+          (error instanceof FirebaseError &&
+            error.code === "auth/id-token-expired") ||
+          error instanceof Error
+        ) {
+          return reply.code(401).send({
+            error: "Your session has expired. Please login again.",
+          });
+        }
+        return reply.code(401).send({
+          error: "You are not authorized to make this request.",
+        });
+      });
+  } else {
+    reply.code(401).send({ error: "Malformed authorization header." });
+  }
+};

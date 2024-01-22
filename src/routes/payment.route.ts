@@ -7,28 +7,28 @@ import {
 } from "fastify";
 
 const paymentRoutes: FastifyPluginCallback = (
-  fastify: FastifyInstance,
+  _fastify: FastifyInstance,
   _opts: RegisterOptions,
   done
 ) => {
   /* User information routes */
-  fastify.get(
+  /* fastify.get(
     "/invoices",
     // [isAuthenticated, isAuthorized],
     paymentService.invoices
-  );
+  ); */
 
-  fastify.get(
+  /* fastify.get(
     "/invoices/:userId",
     // [isAuthenticated, invoicesSchema, isStaff],
     paymentService.invoicesOfUser
-  );
+  ); */
 
   /* Transaction routes */
-  fastify.post(
+  /* fastify.post(
     "/:uid/invoice",
     paymentService.invoice
-    /* [
+    [
       isAuthenticated,
       invoiceSchema,
       errors,
@@ -37,14 +37,14 @@ const paymentRoutes: FastifyPluginCallback = (
       checkUnpaidInvoices,
       checkImageHasInvoice,
     ],
-    paymentService.invoice */
-  );
+    paymentService.invoice
+  ); */
 
-  fastify.delete(
+  /* fastify.delete(
     "/:invoiceId/invoice",
     // [isAuthenticated], paymentService.voidInvoice
     paymentService.voidInvoice
-  );
+  ); */
 
   done();
 };

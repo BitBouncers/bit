@@ -1,18 +1,26 @@
-import { eq } from "drizzle-orm";
 import {
   FastifyInstance,
   FastifyPluginCallback,
-  RegisterOptions,
+  FastifyPluginOptions,
 } from "fastify";
-import { rating, staffCredentials, user } from "../../drizzle/schema";
+import { isAuthenticated } from "src/middlewares/firebase-auth";
+import { userService } from "src/services";
 
 const userRoutes: FastifyPluginCallback = (
   fastify: FastifyInstance,
-  _opts: RegisterOptions,
+  _opts: FastifyPluginOptions,
   done
 ) => {
-  // fastify.get("/me", [isAuthenticated], userController.me);
-  // fastify.get( "/:uid/images", [isAuthenticated, isAuthorized], userController.images);
+  fastify.get("/me", {
+    preHandler: [isAuthenticated],
+    handler: userService.me,
+  });
+
+  fastify.get("/:uid/images", {
+    preHandler: [isAuthenticated],
+    handler: userService.getImages,
+  });
+
   // fastify.get("/patients", [isAuthenticated, isStaff], userController.patients);
   // fastify.get("/profile", [isAuthenticated], userController.profile);
 
@@ -25,51 +33,13 @@ const userRoutes: FastifyPluginCallback = (
   // fastify.post( "/:uid/assign/radiologist", [isAuthenticated, isAuthorized], userController.assignRadiologist);
   // fastify.delete( "/:uid/remove/radiologist", [isAuthenticated, isAuthorized], userController.removeRadiologist);
 
-  fastify.get("/radiologists", async (_request, reply) => {
-    const radiologists = await fastify.db
-      .select({
-        uid: user.uid,
-        title: user.title,
-        first_name: user.firstName,
-        last_name: user.lastName,
-        email: user.email,
-        profile_image_url: user.profileImageUrl,
-        bio: staffCredentials.bio,
-        expertise: staffCredentials.expertise,
-        years_of_exp: staffCredentials.yearsOfExp,
-        average_rating: rating.rating,
-      })
-      .from(user)
-      .leftJoin(staffCredentials, eq(user.uid, staffCredentials.uid))
-      .leftJoin(rating, eq(user.uid, rating.userUid))
-      .where(eq(user.role, "RADIOLOGIST"));
-
-    reply.send({ radiologists });
+  fastify.get("/radiologists", {
+    preHandler: [isAuthenticated],
+    handler: userService.getRadiologists,
   });
 
-  fastify.get("/meet-our-radiologists", async (_request, reply) => {
-    const radiologists = await fastify.db
-      .select({
-        uid: user.uid,
-        title: user.title,
-        first_name: user.firstName,
-        last_name: user.lastName,
-        profile_image_url: user.profileImageUrl,
-        expertise: staffCredentials.expertise,
-      })
-      .from(user)
-      .leftJoin(staffCredentials, eq(user.uid, staffCredentials.uid))
-      .where(eq(user.role, "RADIOLOGIST"))
-      .catch((error: unknown) => {
-        console.log("user.service.meetOurRadiologists: ", error);
-        return reply.send({ radiologists: [] });
-      });
-
-    if (!radiologists) {
-      return reply.send({ radiologists: [] });
-    }
-
-    reply.send(radiologists);
+  fastify.get("/meet-our-radiologists", {
+    handler: userService.getMeetOurRadiologists,
   });
 
   done();

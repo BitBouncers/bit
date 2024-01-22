@@ -1,6 +1,13 @@
-import { cert, initializeApp as initializeAdminApp } from "firebase-admin/app";
-import { getAuth as getAdminAuth } from "firebase-admin/auth";
-import { initializeApp as initializeAppNormal } from "firebase/app";
+import {
+  cert,
+  getApps,
+  initializeApp as initializeAdminApp,
+} from "firebase-admin/app";
+import { Auth, getAuth as getAdminAuth } from "firebase-admin/auth";
+import {
+  FirebaseError,
+  initializeApp as initializeAppNormal,
+} from "firebase/app";
 import {
   getAuth,
   sendPasswordResetEmail,
@@ -15,7 +22,9 @@ import {
   FIREBASE_MESSAGING_SENDER_ID,
   FIREBASE_PROJECT_ID,
   FIREBASE_STORAGE_BUCKET,
-} from "../utils/environment.js";
+} from "../utils/environment";
+
+let firebaseAdmin, adminAuth: Auth;
 
 // Firebase Admin SDK
 if (!FIREBASE_ADMIN_CREDENTIALS) {
@@ -27,16 +36,15 @@ if (!FIREBASE_ADMIN_CREDENTIALS) {
 
 const credential = JSON.parse(FIREBASE_ADMIN_CREDENTIALS);
 
-const firebaseAdmin = initializeAdminApp(
-  {
-    credential: cert(credential),
-  },
-  "radiologyarchive-firebase-admin"
-);
-
-console.log("Firebase Admin SDK initialized");
-
-const adminAuth = getAdminAuth(firebaseAdmin);
+if (!getApps().length) {
+  firebaseAdmin = initializeAdminApp(
+    {
+      credential: cert(credential),
+    },
+    "radiologyarchive-firebase-admin"
+  );
+  adminAuth = getAdminAuth(firebaseAdmin);
+}
 
 // Firebase SDK
 const firebaseConfig = {
@@ -55,12 +63,21 @@ const firebase = initializeAppNormal(
 
 const auth = getAuth(firebase);
 
-export {
-  adminAuth,
-  auth,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  updateProfile,
+const login = async (email: string, password: string) => {
+  return await signInWithEmailAndPassword(auth, email, password)
+    .then(async (userCredential) => {
+      const user = userCredential.user;
+      const returnUser: bit.AuthLoginResponse = {
+        localId: user.uid,
+        displayName: user.displayName,
+        idToken: await user.getIdToken(false),
+        refreshToken: user.refreshToken,
+      };
+      return returnUser;
+    })
+    .catch((error: FirebaseError) => {
+      return error;
+    });
 };
 
-export default firebase;
+export { adminAuth, auth, login, sendPasswordResetEmail, updateProfile };

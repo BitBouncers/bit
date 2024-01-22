@@ -1,3 +1,190 @@
+import { and, eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/mysql-core";
+import {
+  image,
+  imageNote,
+  rating,
+  staffCredentials,
+  user,
+} from "drizzle/schema";
+import { FastifyReply, FastifyRequest } from "fastify";
+
+type Role = "Patient" | "Physician" | "Radiologist" | "Admin";
+
+type MeRole = {
+  role: Role;
+};
+
+interface IUserService {
+  me: (request: FastifyRequest, reply: FastifyReply) => Promise<MeRole>;
+
+  getImages: (
+    request: FastifyRequest<{ Params: { uid: string } }>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  getRadiologists: (
+    request: FastifyRequest<{ Params: { uid: string } }>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  getMeetOurRadiologists: (
+    request: FastifyRequest<{ Params: { uid: string } }>,
+    reply: FastifyReply
+  ) => Promise<void>;
+}
+
+export default class UserService implements IUserService {
+  me = async (request: FastifyRequest, reply: FastifyReply) => {
+    const result = await request.server.db.execute(
+      sql`SELECT role FROM User WHERE uid = ${request.userUID}`
+    );
+    if (result.size === 1) {
+      return reply.send({
+        role:
+          result.rows[0].role.charAt(0) +
+          result.rows[0].role.slice(1).toLowerCase(),
+      });
+    } else {
+      return reply.send({ role: "Patient" });
+    }
+  };
+
+  getImages = async (
+    request: FastifyRequest<{ Params: { uid: string } }>,
+    reply: FastifyReply
+  ) => {
+    const user_uploaded = alias(user, "ua_uploaded");
+    const recommendation = alias(user, "ura");
+    const ua = alias(user, "ua");
+
+    const results = await request.server.db
+      .selectDistinct({
+        uid: image.uid,
+        url: image.url,
+        createdAt: image.createdAt,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        uploadedBy_title: user_uploaded.title,
+        uploadedBy_first_name: user_uploaded.firstName,
+        uploadedBy_last_name: user_uploaded.lastName,
+        authors: {
+          uid: imageNote.authorUid,
+          note: imageNote.note,
+          role: ua.role,
+          full_name: sql<string>`concat(${ua.title}, " ", ${ua.firstName}, " ", ${ua.lastName})`,
+          recommendation: sql<string>`concat(${recommendation.firstName}, " ", ${recommendation.lastName})`,
+        },
+      })
+      .from(user)
+      .innerJoin(image, eq(user.uid, image.uploadedFor))
+      .leftJoin(user_uploaded, eq(image.uploadedBy, user_uploaded.uid))
+      .leftJoin(imageNote, eq(image.uid, imageNote.imageUid))
+      .leftJoin(
+        recommendation,
+        and(
+          eq(imageNote.recommendUid, recommendation.uid),
+          eq(recommendation.role, "RADIOLOGIST")
+        )
+      )
+      .leftJoin(ua, eq(imageNote.authorUid, ua.uid))
+      .where(eq(user.role, "PATIENT") && eq(user.uid, request.params.uid));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const images = results.reduce((acc: any, image: any) => {
+      const existingEntry = acc.find(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (entry: any) => entry.uid === image.uid && entry.url === image.url
+      );
+
+      if (existingEntry) {
+        existingEntry.authors.unshift(image.authors);
+      } else {
+        const newEntry = {
+          uid: image.uid,
+          url: image.url,
+          createdAt: image.createdAt,
+          first_name: image.first_name,
+          last_name: image.last_name,
+          uploadedBy_title: image.uploadedBy_title,
+          uploadedBy_first_name: image.uploadedBy_first_name,
+          uploadedBy_last_name: image.uploadedBy_last_name,
+          authors: [image.authors],
+        };
+        acc.unshift(newEntry);
+      }
+
+      return acc;
+    }, []);
+
+    reply.send({ images });
+  };
+
+  getRadiologists = async (request: FastifyRequest, reply: FastifyReply) => {
+    const radiologists = await request.server.db
+      .select({
+        uid: user.uid,
+        title: user.title,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        email: user.email,
+        profile_image_url: user.profileImageUrl,
+        bio: staffCredentials.bio,
+        expertise: staffCredentials.expertise,
+        years_of_exp: staffCredentials.yearsOfExp,
+        average_rating: rating.rating,
+      })
+      .from(user)
+      .leftJoin(staffCredentials, eq(user.uid, staffCredentials.uid))
+      .leftJoin(rating, eq(user.uid, rating.userUid))
+      .where(eq(user.role, "RADIOLOGIST"));
+
+    reply.send({ radiologists });
+  };
+
+  getMeetOurRadiologists = async (
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) => {
+    const radiologists = await request.server.db
+      .select({
+        uid: user.uid,
+        title: user.title,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        profile_image_url: user.profileImageUrl,
+        expertise: staffCredentials.expertise,
+      })
+      .from(user)
+      .leftJoin(staffCredentials, eq(user.uid, staffCredentials.uid))
+      .where(eq(user.role, "RADIOLOGIST"))
+      .catch((error: unknown) => {
+        console.log("user.service.meetOurRadiologists: ", error);
+        return reply.send({ radiologists: [] });
+      });
+
+    if (!radiologists) {
+      return reply.send({ radiologists: [] });
+    }
+
+    reply.send(radiologists);
+  };
+}
+
+/* handler: async (request, reply) => {
+      const result = await fastify.db.execute(
+        sql`SELECT role FROM User WHERE uid = ${request.userUID}`
+      );
+      if (result.size === 1) {
+        reply.send({
+          role:
+            result.rows[0].role.charAt(0) +
+            result.rows[0].role.slice(1).toLowerCase(),
+        });
+      } else {
+        reply.send({ role: "Patient" });
+      }
+    }, */
 // import crypto from "crypto";
 /* import {
   adminAuth,
@@ -383,5 +570,3 @@
       ) AS authors_subquery ON I.uid = authors_subquery.image_uid \
       WHERE PR.staff_uid = ? \
       GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url"; */
-
-export {};

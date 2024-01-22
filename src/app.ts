@@ -31,9 +31,9 @@ const buildFastify = (opts?: { log?: boolean }) => {
     fastifyApp.log.info(route.method + " " + route.url);
   });
 
-  fastifyApp.register(middie);
   fastifyApp.register(cors, corsOptions);
   fastifyApp.register(drizzlePlugin, { url: DATABASE_URL });
+  fastifyApp.register(middie);
 
   fastifyApp.get("/", (_request, reply) => {
     API_VERSION && reply.header("Api-Version", API_VERSION);

@@ -1,16 +1,8 @@
 import { connect } from "@planetscale/database";
-import {
-  PlanetScaleDatabase,
-  drizzle,
-} from "drizzle-orm/planetscale-serverless";
+import { drizzle } from "drizzle-orm/planetscale-serverless";
+import * as schema from "drizzle/schema";
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-
-declare module "fastify" {
-  interface FastifyInstance {
-    db: PlanetScaleDatabase;
-  }
-}
 
 export interface DrizzlePluginOptions {
   url: string;
@@ -28,7 +20,7 @@ const drizzlePlugin: FastifyPluginAsync<DrizzlePluginOptions> = async (
   }
 
   const dbConn = connect(opts);
-  const db = drizzle(dbConn);
+  const db = drizzle(dbConn, { schema });
 
   fastify.decorate("db", db);
 
