@@ -1,31 +1,7 @@
 import { app, compareArrayOfObjects } from "../helper";
-import {
-  MEET_OUR_RADIOLOGISTS,
-  USER_EMAIL,
-  USER_EMAIL_PHYSICIAN,
-  USER_PW,
-} from "../variables";
+import { AUTH_TOKEN, MEET_OUR_RADIOLOGISTS } from "../variables";
 
 describe("user route", () => {
-  let token: string, physicianToken: string;
-
-  beforeAll(async () => {
-    const response = await app.inject({
-      url: "/api/auth/login",
-      method: "POST",
-      payload: { email: USER_EMAIL, password: USER_PW },
-    });
-
-    const response2 = await app.inject({
-      url: "/api/auth/login",
-      method: "POST",
-      payload: { email: USER_EMAIL_PHYSICIAN, password: USER_PW },
-    });
-
-    token = response.json().idToken;
-    physicianToken = response2.json().idToken;
-  });
-
   test("error with expired bearer token", async () => {
     const response = await app.inject({
       url: "/api/user/me",
@@ -49,7 +25,7 @@ describe("user route", () => {
   test("second opinion radiologists", async () => {
     const response = await app.inject({
       url: "/api/user/radiologists",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PATIENT")}` },
     });
 
     expect(response.json().radiologists?.length).toBeGreaterThan(0);
@@ -82,7 +58,7 @@ describe("user route", () => {
   test("get user patient role", async () => {
     const response = await app.inject({
       url: "/api/user/me",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PATIENT")}` },
     });
 
     expect(response.json().role).toBe("Patient");
@@ -91,9 +67,18 @@ describe("user route", () => {
   test("get user physician role", async () => {
     const response = await app.inject({
       url: "/api/user/me",
-      headers: { Authorization: `Bearer ${physicianToken}` },
+      headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PHYSICIAN")}` },
     });
 
     expect(response.json().role).toBe("Physician");
+  });
+
+  test("get user radiologist role", async () => {
+    const response = await app.inject({
+      url: "/api/user/me",
+      headers: { Authorization: `Bearer ${AUTH_TOKEN.get("RADIOLOGIST")}` },
+    });
+
+    expect(response.json().role).toBe("Radiologoist");
   });
 });
