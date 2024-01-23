@@ -9,7 +9,7 @@
     "db:generate": "NODE_OPTIONS='--import tsx' drizzle-kit generate:mysql",
     "db:introspect": "drizzle-kit introspect:mysql",
     "dev": "cross-env NODE_ENV=development npx tsx watch src",
-    "lint-eslint": "eslint src/**/* --ext ts --config .eslintrc.cjs --no-eslintrc",
+    "lint-eslint": "eslint src/**/* --ext ts",
     "prettier-check": "prettier --check 'src/**/*.ts' 'test/**/*.ts' 'drizzle/**/*.ts'",
     "prettier-fix": "prettier --write 'src/**/*.ts' 'test/**/*.ts' 'drizzle/**/*.ts'",
     "start": "cross-env NODE_ENV=production tsx dist/src",
