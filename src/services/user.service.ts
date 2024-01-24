@@ -7,7 +7,7 @@ import {
   staffCredentials,
   user,
 } from "drizzle/schema";
-import { FastifyReply, FastifyRequest } from "fastify";
+import { FastifyReply, FastifyRequest, UserUIDParams } from "fastify";
 
 type Role = "Patient" | "Physician" | "Radiologist" | "Admin";
 
@@ -19,31 +19,37 @@ interface IUserService {
   me: (request: FastifyRequest, reply: FastifyReply) => Promise<MeRole>;
 
   getImages: (
-    request: FastifyRequest<{ Params: { uid: string } }>,
+    request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => Promise<void>;
 
   getRadiologists: (
-    request: FastifyRequest<{ Params: { uid: string } }>,
+    request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => Promise<void>;
 
   getMeetOurRadiologists: (
-    request: FastifyRequest<{ Params: { uid: string } }>,
+    request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => Promise<void>;
 }
 
 export default class UserService implements IUserService {
   me = async (request: FastifyRequest, reply: FastifyReply) => {
-    const result = await request.server.db.execute(
-      sql`SELECT role FROM User WHERE uid = ${request.userUID}`
-    );
-    if (result.size === 1) {
+    if (!request.userUID) {
+      return reply
+        .code(401)
+        .send({ error: "There was an error with your request." });
+    }
+
+    const u = await request.server.db
+      .select({ role: user.role })
+      .from(user)
+      .where(eq(user.uid, request.userUID));
+
+    if (u.length > 0 && ["PHYSICIAN", "RADIOLOGIST"].includes(u[0].role)) {
       return reply.send({
-        role:
-          result.rows[0].role.charAt(0) +
-          result.rows[0].role.slice(1).toLowerCase(),
+        role: u[0].role.charAt(0) + u[0].role.slice(1).toLowerCase(),
       });
     } else {
       return reply.send({ role: "Patient" });
@@ -51,7 +57,7 @@ export default class UserService implements IUserService {
   };
 
   getImages = async (
-    request: FastifyRequest<{ Params: { uid: string } }>,
+    request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => {
     const user_uploaded = alias(user, "ua_uploaded");
@@ -93,7 +99,7 @@ export default class UserService implements IUserService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const images = results.reduce((acc: any, image: any) => {
       const existingEntry = acc.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (entry: any) => entry.uid === image.uid && entry.url === image.url
       );
 

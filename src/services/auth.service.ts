@@ -98,7 +98,7 @@ import { login } from "src/config/firebase";
   }
 } */
 
-import { FastifyReply, FastifyRequest } from "fastify";
+import { AuthLoginBody, FastifyReply, FastifyRequest } from "fastify";
 
 /* export async function portal(request, reply) {
   const { role } = request.params;
@@ -211,14 +211,14 @@ import { FastifyReply, FastifyRequest } from "fastify";
 
 interface IAuthService {
   loginThroughFirebase: (
-    request: FastifyRequest<{ Body: { email: string; password: string } }>,
+    request: FastifyRequest<AuthLoginBody>,
     reply: FastifyReply
   ) => Promise<FirebaseError | bit.AuthLoginResponse | undefined>;
 }
 
 export default class AuthService implements IAuthService {
   loginThroughFirebase = async (
-    request: FastifyRequest<{ Body: { email: string; password: string } }>,
+    request: FastifyRequest<AuthLoginBody>,
     reply: FastifyReply
   ) => {
     const { email, password } = request.body;
