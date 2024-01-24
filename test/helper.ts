@@ -1,5 +1,12 @@
 import { FastifyInstance } from "fastify";
-import buildFastify from "../src/app";
+import { default as buildFastify } from "../src/app";
+import {
+  AUTH_TOKEN,
+  USER_EMAIL_PATIENT,
+  USER_EMAIL_PHYSICIAN,
+  USER_EMAIL_RADIOLOGIST,
+  USER_PW,
+} from "./variables";
 
 type CompareArraysOfObjects<T> = (arr1: T[], arr2: T[]) => boolean;
 
@@ -27,5 +34,29 @@ const compareArrayOfObjects: CompareArraysOfObjects<any> = (a, b) => {
 };
 
 const testApp = buildFastify({ log: false });
+
+beforeAll(async () => {
+  const response = await testApp.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    body: { email: USER_EMAIL_PATIENT, password: USER_PW },
+  });
+
+  const response2 = await testApp.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    body: { email: USER_EMAIL_PHYSICIAN, password: USER_PW },
+  });
+
+  const response3 = await testApp.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    body: { email: USER_EMAIL_RADIOLOGIST, password: USER_PW },
+  });
+
+  AUTH_TOKEN.set("PATIENT", response.json().idToken);
+  AUTH_TOKEN.set("PHYSICIAN", response2.json().idToken);
+  AUTH_TOKEN.set("RADIOLOGIST", response3.json().idToken);
+});
 
 export { testApp as app, buildLiveApp, compareArrayOfObjects };

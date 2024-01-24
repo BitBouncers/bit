@@ -1,7 +1,14 @@
-export const USER_EMAIL = "patient@test.com";
+export const USER_EMAIL_PATIENT = "patient@test.com";
 export const USER_EMAIL_PHYSICIAN = "physician@test.com";
+export const USER_EMAIL_RADIOLOGIST = "radiologist@test.com";
 export const USER_PW = "testtest123";
 export const USER_WRONG_PW = "testtest1234";
+
+export const AUTH_TOKEN = new Map([
+  ["PATIENT", ""],
+  ["PHYSICIAN", ""],
+  ["RADIOLOGIST", ""],
+]);
 
 export const MEET_OUR_RADIOLOGISTS = [
   {

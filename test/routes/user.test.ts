@@ -79,6 +79,6 @@ describe("user route", () => {
       headers: { Authorization: `Bearer ${AUTH_TOKEN.get("RADIOLOGIST")}` },
     });
 
-    expect(response.json().role).toBe("Radiologoist");
+    expect(response.json().role).toBe("Radiologist");
   });
 });
