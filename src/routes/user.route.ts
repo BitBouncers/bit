@@ -4,6 +4,7 @@ import {
   FastifyPluginOptions,
 } from "fastify";
 import { isAuthenticated } from "src/middlewares/firebase-auth";
+import { isAuthorizedOrStaff } from "src/middlewares/isAuthorizedOrStaff";
 import { userService } from "src/services";
 
 const userRoutes: FastifyPluginCallback = (
@@ -17,7 +18,7 @@ const userRoutes: FastifyPluginCallback = (
   });
 
   fastify.get("/:uid/images", {
-    preHandler: [isAuthenticated],
+    preHandler: [isAuthenticated, isAuthorizedOrStaff],
     handler: userService.getImages,
   });
 

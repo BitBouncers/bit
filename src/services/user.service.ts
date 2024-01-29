@@ -1,12 +1,3 @@
-import { and, eq, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/mysql-core";
-import {
-  image,
-  imageNote,
-  rating,
-  staffCredentials,
-  user,
-} from "drizzle/schema";
 import { FastifyReply, FastifyRequest, UserUIDParams } from "fastify";
 
 type Role = "Patient" | "Physician" | "Radiologist" | "Admin";
@@ -42,14 +33,14 @@ export default class UserService implements IUserService {
         .send({ error: "There was an error with your request." });
     }
 
-    const u = await request.server.db
-      .select({ role: user.role })
-      .from(user)
-      .where(eq(user.uid, request.userUID));
+    const user = await request.server.prisma.user.findUnique({
+      select: { role: true },
+      where: { uid: request.userUID },
+    });
 
-    if (u.length > 0 && ["PHYSICIAN", "RADIOLOGIST"].includes(u[0].role)) {
+    if (user && ["PHYSICIAN", "RADIOLOGIST"].includes(user.role)) {
       return reply.send({
-        role: u[0].role.charAt(0) + u[0].role.slice(1).toLowerCase(),
+        role: user.role.charAt(0) + user.role.slice(1).toLowerCase(),
       });
     } else {
       return reply.send({ role: "Patient" });
@@ -60,90 +51,67 @@ export default class UserService implements IUserService {
     request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => {
-    const user_uploaded = alias(user, "ua_uploaded");
-    const recommendation = alias(user, "ura");
-    const ua = alias(user, "ua");
-
-    const results = await request.server.db
-      .selectDistinct({
-        uid: image.uid,
-        url: image.url,
-        createdAt: image.createdAt,
-        first_name: user.firstName,
-        last_name: user.lastName,
-        uploadedBy_title: user_uploaded.title,
-        uploadedBy_first_name: user_uploaded.firstName,
-        uploadedBy_last_name: user_uploaded.lastName,
-        authors: {
-          uid: imageNote.authorUid,
-          note: imageNote.note,
-          role: ua.role,
-          full_name: sql<string>`concat(${ua.title}, " ", ${ua.firstName}, " ", ${ua.lastName})`,
-          recommendation: sql<string>`concat(${recommendation.firstName}, " ", ${recommendation.lastName})`,
-        },
-      })
-      .from(user)
-      .innerJoin(image, eq(user.uid, image.uploadedFor))
-      .leftJoin(user_uploaded, eq(image.uploadedBy, user_uploaded.uid))
-      .leftJoin(imageNote, eq(image.uid, imageNote.imageUid))
-      .leftJoin(
-        recommendation,
-        and(
-          eq(imageNote.recommendUid, recommendation.uid),
-          eq(recommendation.role, "RADIOLOGIST")
-        )
+    const images = await request.server.prisma
+      .$queryRawUnsafe(
+        "\
+      SELECT \
+        I.uid, I.url, I.createdAt, U.first_name, U.last_name, \
+        UA_uploaded.title as uploadedBy_title, \
+        UA_uploaded.first_name AS uploadedBy_first_name, \
+        UA_uploaded.last_name AS uploadedBy_last_name, \
+        IF(COUNT(INN.note) > 0, \
+          JSON_ARRAYAGG( \
+            JSON_OBJECT( \
+              'uid', INN.author_uid, \
+              'note', INN.note, \
+              'full_name', CONCAT(UA.title, ' ', UA.first_name, ' ', UA.last_name), \
+              'role', UA.role, \
+              'recommendation', \
+              CASE \
+                WHEN URA.uid IS NOT NULL THEN CONCAT(URA.first_name, ' ', URA.last_name) \
+                ELSE NULL \
+              END \
+            ) \
+          ), \
+          JSON_ARRAY() \
+        ) AS authors \
+      FROM User U \
+      JOIN Image I ON U.uid = I.uploaded_for \
+      LEFT JOIN User UA_uploaded ON I.uploaded_by = UA_uploaded.uid \
+      LEFT JOIN ( \
+        SELECT INN.uid, INN.note, INN.image_uid, INN.author_uid, INN.createdAt, INN.recommend_uid \
+        FROM ImageNote INN \
+        JOIN User UA ON INN.author_uid = UA.uid \
+        WHERE UA.role IN ('PHYSICIAN', 'RADIOLOGIST') \
+      ) AS INN ON I.uid = INN.image_uid \
+      LEFT JOIN User URA ON INN.recommend_uid = URA.uid AND URA.role = 'RADIOLOGIST' \
+      LEFT JOIN User UA ON INN.author_uid = UA.uid \
+      WHERE U.role = 'PATIENT' AND U.uid = ? \
+      GROUP BY I.uid, I.url, U.first_name, U.last_name",
+        request.params.uid
       )
-      .leftJoin(ua, eq(imageNote.authorUid, ua.uid))
-      .where(eq(user.role, "PATIENT") && eq(user.uid, request.params.uid));
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const images = results.reduce((acc: any, image: any) => {
-      const existingEntry = acc.find(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (entry: any) => entry.uid === image.uid && entry.url === image.url
-      );
-
-      if (existingEntry) {
-        existingEntry.authors.unshift(image.authors);
-      } else {
-        const newEntry = {
-          uid: image.uid,
-          url: image.url,
-          createdAt: image.createdAt,
-          first_name: image.first_name,
-          last_name: image.last_name,
-          uploadedBy_title: image.uploadedBy_title,
-          uploadedBy_first_name: image.uploadedBy_first_name,
-          uploadedBy_last_name: image.uploadedBy_last_name,
-          authors: [image.authors],
-        };
-        acc.unshift(newEntry);
-      }
-
-      return acc;
-    }, []);
+      .catch((error) => {
+        console.log("user.service.images: ", error);
+      });
 
     reply.send({ images });
   };
 
   getRadiologists = async (request: FastifyRequest, reply: FastifyReply) => {
-    const radiologists = await request.server.db
-      .select({
-        uid: user.uid,
-        title: user.title,
-        first_name: user.firstName,
-        last_name: user.lastName,
-        email: user.email,
-        profile_image_url: user.profileImageUrl,
-        bio: staffCredentials.bio,
-        expertise: staffCredentials.expertise,
-        years_of_exp: staffCredentials.yearsOfExp,
-        average_rating: rating.rating,
-      })
-      .from(user)
-      .leftJoin(staffCredentials, eq(user.uid, staffCredentials.uid))
-      .leftJoin(rating, eq(user.uid, rating.userUid))
-      .where(eq(user.role, "RADIOLOGIST"));
+    const radiologists = await request.server.prisma.$queryRaw`\
+      SELECT \
+        U.uid, U.title, U.first_name, U.last_name, U.email, U.profile_image_url, \
+        SC.bio, SC.expertise, SC.years_of_exp, \
+        AVG(R.rating) as average_rating \
+      FROM User U \
+      LEFT JOIN \
+        StaffCredentials SC ON U.uid = SC.uid \
+      LEFT JOIN \
+        Rating R ON U.uid = R.rated_uid \
+      WHERE U.role = 'RADIOLOGIST' \
+      GROUP BY \
+        U.uid, U.title, U.first_name, U.last_name, U.email, U.profile_image_url, \
+        SC.bio, SC.expertise, SC.years_of_exp`;
 
     reply.send({ radiologists });
   };
@@ -152,22 +120,14 @@ export default class UserService implements IUserService {
     request: FastifyRequest,
     reply: FastifyReply
   ) => {
-    const radiologists = await request.server.db
-      .select({
-        uid: user.uid,
-        title: user.title,
-        first_name: user.firstName,
-        last_name: user.lastName,
-        profile_image_url: user.profileImageUrl,
-        expertise: staffCredentials.expertise,
-      })
-      .from(user)
-      .leftJoin(staffCredentials, eq(user.uid, staffCredentials.uid))
-      .where(eq(user.role, "RADIOLOGIST"))
-      .catch((error: unknown) => {
-        console.log("user.service.meetOurRadiologists: ", error);
-        return reply.send({ radiologists: [] });
-      });
+    const radiologists = await request.server.prisma.$queryRaw`\
+      SELECT U.uid, U.title, U.first_name, U.last_name, U.profile_image_url, \
+        SC.expertise \
+      FROM User U \
+      LEFT JOIN StaffCredentials SC ON U.uid = SC.uid \
+      WHERE U.role = 'RADIOLOGIST' \
+      ORDER BY RAND() \
+      LIMIT 6`;
 
     if (!radiologists) {
       return reply.send({ radiologists: [] });

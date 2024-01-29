@@ -1,10 +1,10 @@
-import { PlanetScaleDatabase } from "drizzle-orm/planetscale-serverless";
+import { PrismaClient } from "@prisma/client";
 import "fastify";
 import { RequestGenericInterface } from "fastify";
 
 declare module "fastify" {
   interface FastifyInstance {
-    db: PlanetScaleDatabase<typeof schema>;
+    prisma: PrismaClient;
   }
 
   interface FastifyRequest {

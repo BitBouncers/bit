@@ -3,7 +3,7 @@ import cors from "@fastify/cors";
 import middie from "@fastify/middie";
 import Fastify from "fastify";
 import { join } from "path";
-import drizzlePlugin from "./config/db";
+import prismaPlugin from "./config/prisma";
 import { API_VERSION, DATABASE_URL, NODE_ENV } from "./utils/environment";
 
 const dirname = process.cwd() + "/src";
@@ -32,7 +32,7 @@ const buildFastify = (opts?: { log?: boolean }) => {
   });
 
   fastifyApp.register(cors, corsOptions);
-  fastifyApp.register(drizzlePlugin, { url: DATABASE_URL });
+  fastifyApp.register(prismaPlugin, { url: DATABASE_URL });
   fastifyApp.register(middie);
 
   fastifyApp.get("/", (_request, reply) => {

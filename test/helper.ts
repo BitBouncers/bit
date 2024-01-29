@@ -22,6 +22,7 @@ const buildLiveApp = async (opts: { log: boolean }) => {
   return server;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const compareArrayOfObjects: CompareArraysOfObjects<any> = (a, b) => {
   if (a.length !== b.length) {
     return false;
