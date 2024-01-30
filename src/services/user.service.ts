@@ -23,6 +23,11 @@ interface IUserService {
     request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => Promise<void>;
+
+  getPatients: (
+    request: FastifyRequest<UserUIDParams>,
+    reply: FastifyReply
+  ) => Promise<void>;
 }
 
 export default class UserService implements IUserService {
@@ -134,6 +139,42 @@ export default class UserService implements IUserService {
     }
 
     reply.send({ radiologists });
+  };
+
+  getPatients = async (request: FastifyRequest, reply: FastifyReply) => {
+    const result = await request.server.prisma.user
+      .findFirst({
+        where: { uid: request.userUID },
+      })
+      .then(async (user) => {
+        if (!user) {
+          return reply.send({ patients: [] });
+        }
+
+        if (user.role === "RADIOLOGIST") {
+          return await request.server.prisma
+            .$queryRawUnsafe(
+              patientsAsRadiologistQuery,
+              request.userUID,
+              request.userUID
+            )
+            .catch((error) => {
+              console.log("user.service.patientsAsRadiologistQuery: ", error);
+            });
+        } else {
+          return await request.server.prisma
+            .$queryRawUnsafe(patientsAsPhysicianQuery, request.userUID)
+            .catch((error: unknown) => {
+              console.log("user.service.patientsAsPhysicianQuery: ", error);
+            });
+        }
+      })
+      .catch((error) => {
+        console.log("user.service.getPatients: ", error);
+        reply.send({ patients: [] });
+      });
+
+    reply.send({ patients: result });
   };
 }
 
@@ -467,7 +508,7 @@ export default class UserService implements IUserService {
   }
 } */
 
-/* const patientsAsRadiologistQuery =
+const patientsAsRadiologistQuery =
   "SELECT U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url, \
         JSON_ARRAYAGG( \
           JSON_OBJECT( \
@@ -504,9 +545,9 @@ export default class UserService implements IUserService {
           AND inv.image_uid = I.uid \
           AND inv.paid = 1 \
       ) \
-      GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url"; */
+      GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url";
 
-/* const patientsAsPhysicianQuery =
+const patientsAsPhysicianQuery =
   "SELECT U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url, \
         JSON_ARRAYAGG( \
           JSON_OBJECT( \
@@ -535,4 +576,4 @@ export default class UserService implements IUserService {
         GROUP BY INN.image_uid \
       ) AS authors_subquery ON I.uid = authors_subquery.image_uid \
       WHERE PR.staff_uid = ? \
-      GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url"; */
+      GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url";

@@ -5,6 +5,7 @@ import {
 } from "fastify";
 import { isAuthenticated } from "src/middlewares/firebase-auth";
 import { isAuthorizedOrStaff } from "src/middlewares/isAuthorizedOrStaff";
+import { isStaff } from "src/middlewares/isStaff";
 import { userService } from "src/services";
 
 const userRoutes: FastifyPluginCallback = (
@@ -22,7 +23,11 @@ const userRoutes: FastifyPluginCallback = (
     handler: userService.getImages,
   });
 
-  // fastify.get("/patients", [isAuthenticated, isStaff], userController.patients);
+  fastify.get("/patients", {
+    preHandler: [isAuthenticated, isStaff],
+    handler: userService.getPatients,
+  });
+
   // fastify.get("/profile", [isAuthenticated], userController.profile);
 
   // fastify.put( "/email", [isAuthenticated, updateEmailSchema, errors], userController.updateNewEmail);
