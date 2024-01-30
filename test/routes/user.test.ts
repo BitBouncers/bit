@@ -50,7 +50,7 @@ describe("user route", () => {
       url: "/api/user/meet-our-radiologists",
     });
 
-    expect(compareArrayOfObjects(response.json(), MEET_OUR_RADIOLOGISTS)).toBe(
+    expect(compareArrayOfObjects(response.json().radiologists, MEET_OUR_RADIOLOGISTS)).toBe(
       true
     );
   });

@@ -133,7 +133,7 @@ export default class UserService implements IUserService {
       return reply.send({ radiologists: [] });
     }
 
-    reply.send(radiologists);
+    reply.send({ radiologists });
   };
 }
 
