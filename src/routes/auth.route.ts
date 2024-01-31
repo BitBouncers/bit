@@ -3,6 +3,7 @@ import {
   FastifyPluginCallback,
   RegisterOptions,
 } from "fastify";
+import { isAuthenticated } from "src/middlewares/firebase-auth";
 import { authService } from "src/services";
 
 const authRoutes: FastifyPluginCallback = (
@@ -17,7 +18,11 @@ const authRoutes: FastifyPluginCallback = (
   // fastify.post("/portal/:role", [portalSchema, errors], authService.portal);
   // fastify.post( "/reset-password", [sendResetPasswordSchema, errors], authService.sendResetPassword);
   // fastify.post("/signup", [signupSchema, errors], authService.signup);
-  // fastify.get("/token", [isAuthenticated], authService.token);
+  //
+  fastify.get("/token", {
+    preHandler: isAuthenticated,
+    handler: authService.verifyToken,
+  });
 
   done();
 };

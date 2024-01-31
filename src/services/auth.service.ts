@@ -214,6 +214,11 @@ interface IAuthService {
     request: FastifyRequest<AuthLoginBody>,
     reply: FastifyReply
   ) => Promise<FirebaseError | bit.AuthLoginResponse | undefined>;
+
+  verifyToken: (
+    request: FastifyRequest<AuthLoginBody>,
+    reply: FastifyReply
+  ) => Promise<void>;
 }
 
 export default class AuthService implements IAuthService {
@@ -233,5 +238,9 @@ export default class AuthService implements IAuthService {
     }
 
     reply.send(res);
+  };
+
+  verifyToken = async (_request: FastifyRequest, reply: FastifyReply) => {
+    reply.send({ msg: "You are authenticated." });
   };
 }
