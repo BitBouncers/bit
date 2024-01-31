@@ -1,5 +1,11 @@
 import { app, compareArrayOfObjects } from "../helper";
-import { AUTH_TOKEN, MEET_OUR_RADIOLOGISTS } from "../variables";
+import {
+  AUTH_TOKEN,
+  MEET_OUR_RADIOLOGISTS,
+  USER_IMAGES_API_KEYS,
+  USER_PATIENTS_API_KEYS,
+  USER_UID_PATIENT,
+} from "../variables";
 
 describe("user route", () => {
   test("error with expired bearer token", async () => {
@@ -82,55 +88,81 @@ describe("user route", () => {
     expect(response.json().role).toBe("Radiologist");
   });
 
-  test("get patients as patient", async () => {
-    const response = await app.inject({
-      url: "/api/user/patients",
-      headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PATIENT")}` },
+  // isAuthorizedOrStaff middleware
+  describe("get images api", () => {
+    test("get images as patient owner", async () => {
+      const response = await app.inject({
+        url: `/api/user/${USER_UID_PATIENT}/images`,
+        headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PATIENT")}` },
+      });
+
+      expect(response.json().images.length).toBeGreaterThan(0);
+      expect(Object.keys(response.json().images[0])).toEqual(
+        expect.arrayContaining(USER_IMAGES_API_KEYS)
+      );
     });
 
-    expect(response.statusCode).toBe(401);
-    expect(response.json().error).toBe(
-      "You are not authorized to make this request."
-    );
+    test("get patient images as physician", async () => {
+      const response = await app.inject({
+        url: `/api/user/${USER_UID_PATIENT}/images`,
+        headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PHYSICIAN")}` },
+      });
+
+      expect(response.json().images.length).toBeGreaterThan(0);
+      expect(Object.keys(response.json().images[0])).toEqual(
+        expect.arrayContaining(USER_IMAGES_API_KEYS)
+      );
+    });
+
+    test("get patient images as radiologist", async () => {
+      const response = await app.inject({
+        url: `/api/user/${USER_UID_PATIENT}/images`,
+        headers: { Authorization: `Bearer ${AUTH_TOKEN.get("RADIOLOGIST")}` },
+      });
+
+      expect(response.json().images.length).toBeGreaterThan(0);
+      expect(Object.keys(response.json().images[0])).toEqual(
+        expect.arrayContaining(USER_IMAGES_API_KEYS)
+      );
+    });
   });
 
-  test("get patients as physician", async () => {
-    const response = await app.inject({
-      url: "/api/user/patients",
-      headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PHYSICIAN")}` },
+  // isStaff middleware
+  describe("get patients api", () => {
+    test("get patients as patient", async () => {
+      const response = await app.inject({
+        url: "/api/user/patients",
+        headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PATIENT")}` },
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(response.json().error).toBe(
+        "You are not authorized to make this request."
+      );
     });
 
-    expect(response.json().patients.length).toBeGreaterThan(0);
-    expect(Object.keys(response.json().patients[0])).toEqual(
-      expect.arrayContaining([
-        "uid",
-        "dob",
-        "first_name",
-        "last_name",
-        "email",
-        "profile_image_url",
-        "images",
-      ])
-    );
-  });
+    test("get patients as physician", async () => {
+      const response = await app.inject({
+        url: "/api/user/patients",
+        headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PHYSICIAN")}` },
+      });
 
-  test("get patients as radiologist", async () => {
-    const response = await app.inject({
-      url: "/api/user/patients",
-      headers: { Authorization: `Bearer ${AUTH_TOKEN.get("RADIOLOGIST")}` },
+      expect(response.json().patients.length).toBeGreaterThan(0);
+      expect(Object.keys(response.json().patients[0])).toEqual(
+        expect.arrayContaining(USER_PATIENTS_API_KEYS)
+      );
     });
 
-    expect(response.json().patients.length).toBeGreaterThan(0);
-    expect(Object.keys(response.json().patients[0])).toEqual(
-      expect.arrayContaining([
-        "uid",
-        "dob",
-        "first_name",
-        "last_name",
-        "email",
-        "profile_image_url",
-        "images",
-      ])
-    );
+    test("get patients as radiologist", async () => {
+      const response = await app.inject({
+        url: "/api/user/patients",
+        headers: { Authorization: `Bearer ${AUTH_TOKEN.get("RADIOLOGIST")}` },
+      });
+
+      expect(response.json().patients.length).toBeGreaterThan(0);
+      expect(Object.keys(response.json().patients[0])).toEqual(
+        expect.arrayContaining(USER_PATIENTS_API_KEYS)
+      );
+    });
   });
 });
