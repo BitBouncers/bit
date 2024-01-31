@@ -82,7 +82,7 @@ describe("user route", () => {
     expect(response.json().role).toBe("Radiologist");
   });
 
-  test("get patients as physician", async () => {
+  test("get patients as patient", async () => {
     const response = await app.inject({
       url: "/api/user/patients",
       headers: { Authorization: `Bearer ${AUTH_TOKEN.get("PATIENT")}` },
