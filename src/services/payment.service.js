@@ -1,4 +1,4 @@
-import dbConn from "../config/db.js";
+import sql from "../config/db.js";
 import stripe from "../config/stripe.js";
 
 export async function invoice(req, res) {
@@ -29,14 +29,11 @@ export async function invoice(req, res) {
     })
     .then((invoice) => {
       stripe.invoices.sendInvoice(invoice.id).then(() => {
-        dbConn
-          .execute(
-            "INSERT IGNORE INTO PatientRelation(patient_uid, staff_uid) VALUES(?, ?)",
-            [req.userUID, req.params.uid]
-          )
-          .catch((error) =>
-            console.log("payment.service.invoice: ", error.code, error.message)
-          );
+        sql`
+          INSERT INTO "PatientRelation" (patient_uid, staff_uid)
+          VALUES (${req.userUID}, ${req.params.uid})
+          ON CONFLICT(patient_uid, staff_uid) DO NOTHING
+          `.catch((error) => console.log("payment.service.invoice: ", error.code, error.message));
         res.status(200).json({
           success: true,
           msg: "Successfully created invoice.",
@@ -50,14 +47,12 @@ export async function invoice(req, res) {
 }
 
 export async function invoices(req, res) {
-  await dbConn
-    .execute(
-      "SELECT uid, url, radiologist_uid, amount, paid, createdAt FROM Invoice WHERE patient_uid = ? \
-         ORDER BY createdAt DESC",
-      [req.userUID]
-    )
+  await sql`SELECT uid, url, radiologist_uid, amount, paid, "createdAt"
+    FROM "Invoice"
+    WHERE patient_uid = ${req.userUID}
+    ORDER BY "createdAt" DESC`
     .then((result) => {
-      res.status(200).json({ data: result.rows });
+      res.status(200).json({ data: result });
     })
     .catch((error) => {
       console.log("Error fetching invoices: ", error);
@@ -69,14 +64,12 @@ export async function invoices(req, res) {
 }
 
 export async function invoicesOfUser(req, res) {
-  await dbConn
-    .execute(
-      "SELECT uid, url, radiologist_uid, amount, paid, createdAt FROM Invoice WHERE patient_uid = ? \
-         ORDER BY createdAt DESC",
-      [req.params.userId]
-    )
+  await sql`SELECT uid, url, radiologist_uid, amount, paid, "createdAt"
+    FROM "Invoice"
+    WHERE patient_uid = ${req.params.userId}
+    ORDER BY "createdAt" DESC`
     .then((result) => {
-      res.status(200).json({ data: result.rows });
+      res.status(200).json({ data: result });
     })
     .catch((error) => {
       console.log("Error fetching invoices: ", error);
@@ -88,20 +81,15 @@ export async function invoicesOfUser(req, res) {
 }
 
 export async function voidInvoice(req, res) {
-  await dbConn
-    .execute("UPDATE Invoice SET paid = true WHERE uid = ? AND paid = false", [
-      req.params.invoiceId,
-    ])
+  await sql`UPDATE "Invoice" SET paid = true WHERE uid = ${req.params.invoiceId} AND paid = false`
     .then((result) => {
-      if (result.rows.length === 0) {
+      if (result.length === 0) {
         return res.status(200).json({
           success: true,
           msg: "Invoice has already been paid or does not exist",
         });
       }
-      res
-        .status(200)
-        .json({ success: true, msg: "Successfully voided invoice" });
+      res.status(200).json({ success: true, msg: "Successfully voided invoice" });
     })
     .catch((error) => {
       console.log("Error voiding invoice: ", error);

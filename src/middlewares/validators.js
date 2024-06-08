@@ -1,5 +1,5 @@
 import { checkSchema } from "express-validator";
-import dbConn from "../config/db.js";
+import sql from "../config/db.js";
 import { adminAuth } from "../config/firebase.js";
 
 async function checkEmailExists(email) {
@@ -16,13 +16,9 @@ async function checkEmailExists(email) {
 }
 
 async function checkImageExists(uid) {
-  await dbConn
-    .execute(
-      "SELECT CASE WHEN EXISTS (SELECT 1 FROM Image WHERE uid = ?) THEN 1 ELSE 0 END AS image_exists",
-      [uid]
-    )
+  await sql`SELECT CASE WHEN EXISTS (SELECT 1 FROM "Image" WHERE uid = ${uid}) THEN 1 ELSE 0 END AS image_exists`
     .then((result) => {
-      if (result.rows[0].image_exists === "1") {
+      if (result[0].image_exists === 1) {
         return Promise.resolve();
       } else {
         return Promise.reject();
@@ -35,15 +31,11 @@ async function checkImageExists(uid) {
 }
 
 async function checkPatientExists(uid, { req }) {
-  await dbConn
-    .execute("SELECT email, first_name, last_name FROM User WHERE uid = ?", [
-      uid,
-    ])
+  await sql`SELECT email, first_name, last_name FROM "User" WHERE uid = ${uid}`
     .then((result) => {
-      if (result.rows.length > 0) {
-        req.patientEmail = result.rows[0].email;
-        req.patientName =
-          result.rows[0].first_name + " " + result.rows[0].last_name;
+      if (result.count > 0) {
+        req.patientEmail = result[0].email;
+        req.patientName = result[0].first_name + " " + result[0].last_name;
         return Promise.resolve(req);
       }
       return Promise.reject();
@@ -56,32 +48,29 @@ async function checkPatientExists(uid, { req }) {
 
 async function checkPhysicianExistsInHospital(hospital, { req }) {
   if (req.body.role === "physician") {
-    await dbConn
-      .execute(
-        "\
-      SELECT \
-        U.uid, U.first_name, U.last_name, U.dob, U.claimed_as_physician \
-      FROM User AS U \
-      JOIN \
-        HospitalPhysician AS HP ON U.uid = HP.physician_uid \
-      WHERE HP.hospital_uid = ? \
-      AND \
-        U.first_name = ? \
-      AND \
-        U.last_name = ? \
-      AND \
-        U.dob = ? \
-      AND \
-        U.claimed_as_physician = false",
-        [hospital, req.body.first_name, req.body.last_name, req.body.dob]
-      )
+    await sql`
+      SELECT
+        U.uid, U.first_name, U.last_name, U.dob, U.claimed_as_physician
+      FROM "User" AS U
+      JOIN
+        "HospitalPhysician" AS HP ON U.uid = HP.physician_uid
+      WHERE HP.hospital_uid = ${hospital}
+      AND
+        U.first_name = ${req.body.first_name}
+      AND
+        U.last_name = ${req.body.last_name}
+      AND
+        U.dob = ${req.body.dob}
+      AND
+        U.claimed_as_physician = 'false'
+      `
       .then((result) => {
-        if (result.size === 0) {
+        if (result.count === 0) {
           return Promise.reject();
-        } else if (result.rows[0].claimed_as_physician === 1) {
+        } else if (result[0].claimed_as_physician === 1) {
           return Promise.reject();
-        } else if (result.rows[0].claimed_as_physician === 0) {
-          req.userUID = result.rows[0].uid;
+        } else if (result[0].claimed_as_physician === 0) {
+          req.userUID = result[0].uid;
           return Promise.resolve(req);
         } else {
           return Promise.reject();
@@ -93,10 +82,9 @@ async function checkPhysicianExistsInHospital(hospital, { req }) {
 }
 
 async function checkRadiologistExists(uid, { req }) {
-  await dbConn
-    .execute("SELECT uid FROM User WHERE uid = ?", [uid])
+  await sql`SELECT uid FROM "User" WHERE uid = ${uid}`
     .then((result) => {
-      if (result.rows.length > 0) {
+      if (result.count > 0) {
         return Promise.resolve(req);
       }
       return Promise.reject();
@@ -108,18 +96,15 @@ async function checkRadiologistExists(uid, { req }) {
 }
 
 async function checkRatingsEnabled(uid) {
-  const result = await dbConn.execute(
-    "SELECT \
-      uid, \
-      CASE \
-        WHEN allow_ratings = 1 THEN 'true' \
-        ELSE 'false' \
-      END AS allow_ratings \
-    FROM User WHERE uid = ?",
-    [uid]
-  );
-  if (result.rows.length === 0) return Promise.reject();
-  if (result.rows[0].allow_ratings === "true") {
+  const result = await sql`SELECT
+      uid,
+      CASE
+        WHEN allow_ratings = true THEN 1
+        ELSE 0
+      END AS allow_ratings
+    FROM "User" WHERE uid = ${uid}`;
+  if (result.count === 0) return Promise.reject();
+  if (result[0].allow_ratings === 1) {
     return Promise.resolve();
   } else {
     return Promise.reject();
@@ -127,12 +112,9 @@ async function checkRatingsEnabled(uid) {
 }
 
 async function checkRoleIsRadiologist(uid, { req }) {
-  await dbConn
-    .execute("SELECT uid FROM User WHERE uid = ? AND role = 'RADIOLOGIST'", [
-      uid,
-    ])
+  await sql`SELECT uid FROM "User" WHERE uid = ${uid} AND role = 'RADIOLOGIST'`
     .then((result) => {
-      if (result.rows.length > 0) {
+      if (result.count > 0) {
         return Promise.resolve(req);
       }
       return Promise.reject();
@@ -144,14 +126,11 @@ async function checkRoleIsRadiologist(uid, { req }) {
 }
 
 async function checkInvoiceExists(uid, { req }) {
-  await dbConn
-    .execute(
-      "SELECT uid, patient_uid, amount FROM Invoice WHERE uid = ? AND patient_uid = ?",
-      [uid, req.userUID]
-    )
+  await sql
+    .execute("SELECT uid, patient_uid, amount FROM Invoice WHERE uid = ? AND patient_uid = ?", [uid, req.userUID])
     .then((result) => {
-      if (result.rows.length > 0) {
-        req.amount = result.rows[0].amount;
+      if (result.count > 0) {
+        req.amount = result[0].amount;
         return Promise.resolve(req);
       }
       return Promise.reject();
@@ -163,11 +142,11 @@ async function checkInvoiceExists(uid, { req }) {
 }
 
 async function checkInvoicePaid(uid) {
-  await dbConn
+  await sql
     .execute("SELECT paid FROM Invoice WHERE uid = ?", [uid])
     .then((result) => {
-      if (result.rows.length > 0) {
-        if (result.rows[0].paid) return Promise.reject(); // paid
+      if (result.count > 0) {
+        if (result[0].paid) return Promise.reject(); // paid
         return Promise.resolve(); // not paid
       }
       return Promise.reject();
@@ -250,8 +229,7 @@ export const signupSchema = checkSchema(
       physicianExists: {
         bail: true,
         custom: checkPhysicianExistsInHospital,
-        errorMessage:
-          "Account already exists or physician not found in hospital",
+        errorMessage: "Account already exists or physician not found in hospital",
       },
     },
   },

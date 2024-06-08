@@ -22,7 +22,7 @@ export function isAuthenticated(req, res, next) {
       console.log(error.code, error.message);
       res
         .status(401)
-        .send({ error: "You are not authorized to make this request" });
+        .send({ error: "You are not authorized to make this request." });
     }
   });
 }

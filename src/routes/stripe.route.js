@@ -1,5 +1,5 @@
 import express from "express";
-import dbConn from "../config/db.js";
+import sql from "../config/db.js";
 import stripe, { stripeEventStore } from "../config/stripe.js";
 import { notify } from "../services/notification.service.js";
 import { STRIPE_WEBHOOK_SECRET_KEY } from "../utils/environment.js";
@@ -11,11 +11,7 @@ router.post(express.raw({ type: "application/json" }), (req, res) => {
 
   try {
     const sig = req.headers["stripe-signature"];
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      STRIPE_WEBHOOK_SECRET_KEY
-    );
+    event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET_KEY);
     if (stripeEventStore.has(event.id)) {
       return res.status(400).send(`Event ${event.id} already processed`);
     }
@@ -38,29 +34,27 @@ router.post(express.raw({ type: "application/json" }), (req, res) => {
     case "invoice.created":
       break;
     case "invoice.finalized":
-      dbConn
-        .execute(
-          "INSERT IGNORE INTO Invoice (uid, url, image_uid, patient_uid, radiologist_uid, amount, paid, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-          [
-            event.data.object.id,
-            event.data.object.hosted_invoice_url,
-            event.data.object.metadata.image,
-            event.data.object.metadata.patient,
-            event.data.object.metadata.radiologist,
-            event.data.object.total / 100,
-            event.data.object.paid,
-            new Date(event.data.object.created * 1000), // in GMT
-          ]
+      // createdAt is in GMT
+      sql`
+        INSERT INTO "Invoice" (uid, url, image_uid, patient_uid, radiologist_uid, amount, paid, "createdAt")
+        VALUES(
+          ${event.data.object.id},
+          ${event.data.object.hosted_invoice_url},
+          ${event.data.object.metadata.image},
+          ${event.data.object.metadata.patient},
+          ${event.data.object.metadata.radiologist},
+          ${event.data.object.total / 100},
+          ${event.data.object.paid},
+          ${new Date(event.data.object.created * 1000)}
         )
-        .catch((error) => console.log("Error inserting invoice: ", error));
+        ON CONFLICT (uid) DO NOTHING
+        `.catch((error) => console.log("Error inserting invoice: ", error));
       break;
     case "invoice.payment_succeeded":
       break;
     case "invoice.paid":
       try {
-        dbConn.execute("UPDATE Invoice SET paid = 1 WHERE uid = ?", [
-          event.data.object.id,
-        ]);
+        sql`UPDATE Invoice SET paid = true WHERE uid = ${event.data.object.id}`;
         notify(
           event.data.object.metadata.radiologist,
           event.data.object.metadata.patient,
@@ -77,9 +71,7 @@ router.post(express.raw({ type: "application/json" }), (req, res) => {
     case "invoice.updated":
       break;
     case "invoice.voided":
-      dbConn.execute("UPDATE Invoice SET paid = 1 WHERE uid = ?", [
-        event.data.object.id,
-      ]);
+      sql`UPDATE Invoice SET paid = 1 WHERE uid = ${event.data.object.id}`;
       break;
     case "payment_method.attached":
       break;

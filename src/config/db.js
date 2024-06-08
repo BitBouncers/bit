@@ -1,10 +1,8 @@
-import { connect } from "@planetscale/database";
 import { DATABASE_URL } from "../utils/environment.js";
+import postgres from "postgres";
 
-const sqlConfig = {
-  url: DATABASE_URL,
-};
+const connectionString = DATABASE_URL;
 
-const dbConn = connect(sqlConfig);
+const sql = postgres(connectionString);
 
-export default dbConn;
+export default sql;

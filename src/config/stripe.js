@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { STRIPE_SECRET_KEY } from "../utils/environment.js";
 
 const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16",
+  apiVersion: "2024-04-10",
 });
 
 const stripeEventStore = new Set();

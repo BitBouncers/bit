@@ -33,7 +33,11 @@ router.get("/patients", [isAuthenticated, isStaff], userController.patients);
 router.get("/profile", [isAuthenticated], userController.profile);
 router.get("/radiologists", [], userController.radiologists);
 
-router.put("/email", [isAuthenticated, updateEmailSchema, errors], userController.updateNewEmail);
+router.put(
+  "/email",
+  [isAuthenticated, updateEmailSchema, errors],
+  userController.updateNewEmail
+);
 router.put(
   "/profile",
   [isAuthenticated, updateProfileSchema, errors],
@@ -44,7 +48,7 @@ router.post(
   "/rate",
   [isAuthenticated, rateRadiologistSchema, errors],
   userController.rateRadiologist
-)
+);
 router.post(
   "/upload-image",
   [isAuthenticated, isStaff, uploadImageSchema, errors],
