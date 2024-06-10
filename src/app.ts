@@ -1,9 +1,9 @@
 import autoLoad from "@fastify/autoload";
 import cors from "@fastify/cors";
 import middie from "@fastify/middie";
+import postgres from "@fastify/postgres";
 import Fastify from "fastify";
 import { join } from "path";
-import prismaPlugin from "./config/prisma";
 import { API_VERSION, DATABASE_URL, NODE_ENV } from "./utils/environment";
 
 const dirname = process.cwd() + "/src";
@@ -31,8 +31,8 @@ const buildFastify = (opts?: { log?: boolean }) => {
     fastifyApp.log.info(route.method + " " + route.url);
   });
 
+  fastifyApp.register(postgres, { connectionString: DATABASE_URL });
   fastifyApp.register(cors, corsOptions);
-  fastifyApp.register(prismaPlugin, { url: DATABASE_URL });
   fastifyApp.register(middie);
 
   fastifyApp.get("/", (_request, reply) => {

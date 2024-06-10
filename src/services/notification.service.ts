@@ -1,71 +1,68 @@
-export async function notify(
-  receipient: string,
-  senderUid: string,
-  message: string,
-  to?: string
-) {
-  /* try {
-    const now = new Date().toISOString();
-    return db
-      .insert(notification)
-      .values({
-        recipientUid: receipient,
-        senderUid,
-        message,
-        createdAt: now,
-        timestamp: now,
-        to,
-      })
-      .execute();
+import {
+  FastifyReply,
+  FastifyRequest,
+  NotificationReadBody,
+  UserUIDParams,
+} from "fastify";
 
-    const { rows } = await db.execute(
-      "INSERT INTO \
-        Notification (recipient_uid, sender_uid, message, createdAt, timestamp, `to`) \
-        VALUES (?, ?, ?, ?, ?, ?)",
-      [receipient, sender, message, now, now, to]
-    );
-  } catch (error) {
-    console.log("notification.service.notify: ", error);
-  } */
+interface INotificationService {
+  polling: (
+    request: FastifyRequest<UserUIDParams>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  read: (
+    request: FastifyRequest<NotificationReadBody>,
+    reply: FastifyReply
+  ) => Promise<void>;
 }
 
-/* export async function polling(request, reply) {
-  try {
-    const { rows } = await dbConn.execute(
-      "\
-      SELECT \
-        uid, `read`, timestamp, message, DATE(createdAt) as createdAt, `to` \
-      FROM \
-        Notification WHERE recipient_uid = ? \
-      ORDER BY timestamp DESC",
-      [request.userUID]
-    );
-    if (rows.length > 0) {
-      reply.status(200).send(rows);
-    } else {
-      reply.status(204).end();
+export default class NotificationService implements INotificationService {
+  polling = async (
+    request: FastifyRequest<UserUIDParams>,
+    reply: FastifyReply
+  ) => {
+    try {
+      const { rows } = await request.server.pg.query(`
+      SELECT
+        CASE
+          WHEN read THEN 1
+          ELSE 0
+        END AS read,
+        uid, timestamp, message, "createdAt", "to"
+      FROM
+        "Notification" WHERE recipient_uid = ${request.userUID}
+      ORDER BY timestamp DESC
+    `);
+      if (rows) {
+        reply.status(200).send(rows);
+      } else {
+        reply.status(204);
+      }
+    } catch (error) {
+      console.log("notification.service.polling: ", error);
     }
-  } catch (error) {
-    console.log("notification.service.polling: ", error);
-  }
-} */
+  };
 
-/* export async function read(request, reply) {
-  const { read } = request.body;
+  read = async (
+    request: FastifyRequest<NotificationReadBody>,
+    reply: FastifyReply
+  ) => {
+    const { read } = request.body;
 
-  if (read.length === 0) return reply.status(204).end();
+    if (read.length === 0) return reply.status(204);
 
-  try {
-    const result = await dbConn.execute(
-      "UPDATE Notification SET `read` = 1 WHERE uid IN (?)",
-      [read]
-    ); */
-/* return reply.send({
-      success: result.rowsAffected === read.length ? true : false,
-      read,
-    });
-  } catch (error) {
-    console.log("notification.service.read: ", error);
-    // return reply.status(500).send({ message: "Internal server error" });
-  }
-} */
+    try {
+      const result = await request.server.pg.query(
+        `UPDATE "Notification" SET read = true WHERE uid = ANY(${read}::uuid[])`
+      );
+      return reply.send({
+        success: result.rowCount === read.length ? true : false,
+        read,
+      });
+    } catch (error) {
+      console.log("notification.service.read: ", error);
+      return reply.status(500).send({ message: "Internal server error" });
+    }
+  };
+}

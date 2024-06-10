@@ -20,7 +20,7 @@
   "ignorePatterns": ["dist", "docs"],
   "overrides": [
     {
-      "files": ["*.js"]
+      "files": ["*.js", "*.ts"]
     },
     {
       "files": ["test/**/*.ts"],

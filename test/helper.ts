@@ -60,4 +60,8 @@ beforeAll(async () => {
   AUTH_TOKEN.set("RADIOLOGIST", response3.json().idToken);
 });
 
+afterAll(async () => {
+  testApp.close();
+});
+
 export { testApp as app, buildLiveApp, compareArrayOfObjects };

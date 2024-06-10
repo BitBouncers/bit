@@ -1,12 +1,7 @@
-import { PrismaClient } from "@prisma/client";
 import "fastify";
 import { RequestGenericInterface } from "fastify";
 
 declare module "fastify" {
-  interface FastifyInstance {
-    prisma: PrismaClient;
-  }
-
   interface FastifyRequest {
     stripeID?: string;
     userUID?: string;
@@ -18,6 +13,12 @@ declare module "fastify" {
     Body: {
       email: string;
       password: string;
+    };
+  }
+
+  interface NotificationReadBody extends RequestGenericInterface {
+    Body: {
+      read: string[];
     };
   }
 

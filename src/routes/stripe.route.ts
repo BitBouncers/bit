@@ -1,6 +1,29 @@
 import { FastifyPluginCallback, FastifyRequest } from "fastify";
+import Stripe from "stripe";
 import stripe, { stripeEventStore } from "../config/stripe";
 import { STRIPE_WEBHOOK_SECRET_KEY } from "../utils/environment";
+
+interface Event {
+  data: {
+    object: Stripe.Invoice;
+  };
+}
+
+const validateEventData = (event: Event) => {
+  const { id, hosted_invoice_url, metadata, total, paid, created } =
+    event.data.object;
+
+  if (!id) return false;
+  if (!hosted_invoice_url) return false;
+  if (!metadata?.image) return false;
+  if (!metadata?.patient) return false;
+  if (!metadata?.radiologist) return false;
+  if (typeof total !== "number") return false;
+  if (typeof paid !== "boolean") return false;
+  if (!created) return false;
+
+  return true;
+};
 
 const stripeRoutes: FastifyPluginCallback = (fastify, _, done) => {
   fastify.addContentTypeParser(
@@ -56,35 +79,40 @@ const stripeRoutes: FastifyPluginCallback = (fastify, _, done) => {
       case "invoice.created":
         break;
       case "invoice.finalized":
-        /* db.execute(
-            "INSERT IGNORE INTO Invoice (uid, url, image_uid, patient_uid, radiologist_uid, amount, paid, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [
-              event.data.object.id,
-              event.data.object.hosted_invoice_url,
-              event.data.object.metadata?.image,
-              event.data.object.metadata?.patient,
-              event.data.object.metadata?.radiologist,
-              event.data.object.total / 100,
-              event.data.object.paid,
-              new Date(event.data.object.created * 1000), // in GMT
-            ]
-          )
-          .catch((error) => console.log("Error inserting invoice: ", error)); */
+        if (validateEventData(event)) {
+          // createdAt is in GMT
+          request.server.pg
+            .query(
+              `
+            INSERT INTO "Invoice" (uid, url, image_uid, patient_uid, radiologist_uid, amount, paid, "createdAt")
+            VALUES(
+              ${event.data.object.id},
+              ${event.data.object.hosted_invoice_url as string},
+              ${event.data.object.metadata?.image as string},
+              ${event.data.object.metadata?.patient as string},
+              ${event.data.object.metadata?.radiologist as string},
+              ${event.data.object.total / 100},
+              ${event.data.object.paid},
+              ${new Date(event.data.object.created * 1000)}
+            )
+            ON CONFLICT (uid) DO NOTHING
+          `
+            )
+            .catch((error) => console.log("Error inserting invoice: ", error));
+        }
         break;
       case "invoice.payment_succeeded":
         break;
       case "invoice.paid":
         try {
-          /* dbConn.execute("UPDATE Invoice SET paid = 1 WHERE uid = ?", [
-            event.data.object.id,
-          ]);
-          notify(
-            event.data.object.metadata?.radiologist,
-            event.data.object.metadata?.patient,
-            `${event.data.object.customer_name} has paid for an analysis.`,
-            "/patients"
-          ); */
-          stripeEventStore.add(event.id);
+          /* sql`UPDATE Invoice SET paid = true WHERE uid = ${event.data.object.id}`;
+        notify(
+          event.data.object.metadata.radiologist,
+          event.data.object.metadata.patient,
+          `${event.data.object.customer_name} has paid for an analysis.`,
+          "/patients"
+        );
+        stripeEventStore.add(event.id); */
         } catch (error) {
           console.log("Error updating invoice: ", error);
         }
@@ -94,9 +122,7 @@ const stripeRoutes: FastifyPluginCallback = (fastify, _, done) => {
       case "invoice.updated":
         break;
       case "invoice.voided":
-        /* dbConn.execute("UPDATE Invoice SET paid = 1 WHERE uid = ?", [
-          event.data.object.id,
-        ]); */
+        // sql`UPDATE Invoice SET paid = true WHERE uid = ${event.data.object.id}`;
         break;
       case "payment_method.attached":
         break;

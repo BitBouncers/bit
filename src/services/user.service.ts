@@ -1,4 +1,5 @@
 import { FastifyReply, FastifyRequest, UserUIDParams } from "fastify";
+import * as Pg from "pg";
 
 type Role = "Patient" | "Physician" | "Radiologist" | "Admin";
 
@@ -38,14 +39,15 @@ export default class UserService implements IUserService {
         .send({ error: "There was an error with your request." });
     }
 
-    const user = await request.server.prisma.user.findUnique({
-      select: { role: true },
-      where: { uid: request.userUID },
-    });
+    const user = await request.server.pg.query(
+      `SELECT role FROM "User" WHERE uid = '${request.userUID}';`
+    );
 
-    if (user && ["PHYSICIAN", "RADIOLOGIST"].includes(user.role)) {
+    if (user && ["PHYSICIAN", "RADIOLOGIST"].includes(user.rows[0].role)) {
       return reply.send({
-        role: user.role.charAt(0) + user.role.slice(1).toLowerCase(),
+        role:
+          user.rows[0].role.charAt(0) +
+          user.rows[0].role.slice(1).toLowerCase(),
       });
     } else {
       return reply.send({ role: "Patient" });
@@ -56,123 +58,115 @@ export default class UserService implements IUserService {
     request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => {
-    const images = await request.server.prisma
-      .$queryRawUnsafe(
-        "\
-      SELECT \
-        I.uid, I.url, I.createdAt, U.first_name, U.last_name, \
-        UA_uploaded.title as uploadedBy_title, \
-        UA_uploaded.first_name AS uploadedBy_first_name, \
-        UA_uploaded.last_name AS uploadedBy_last_name, \
-        IF(COUNT(INN.note) > 0, \
-          JSON_ARRAYAGG( \
-            JSON_OBJECT( \
-              'uid', INN.author_uid, \
-              'note', INN.note, \
-              'full_name', CONCAT(UA.title, ' ', UA.first_name, ' ', UA.last_name), \
-              'role', UA.role, \
-              'recommendation', \
-              CASE \
-                WHEN URA.uid IS NOT NULL THEN CONCAT(URA.first_name, ' ', URA.last_name) \
-                ELSE NULL \
-              END \
-            ) \
-          ), \
-          JSON_ARRAY() \
-        ) AS authors \
-      FROM User U \
-      JOIN Image I ON U.uid = I.uploaded_for \
-      LEFT JOIN User UA_uploaded ON I.uploaded_by = UA_uploaded.uid \
-      LEFT JOIN ( \
-        SELECT INN.uid, INN.note, INN.image_uid, INN.author_uid, INN.createdAt, INN.recommend_uid \
-        FROM ImageNote INN \
-        JOIN User UA ON INN.author_uid = UA.uid \
-        WHERE UA.role IN ('PHYSICIAN', 'RADIOLOGIST') \
-      ) AS INN ON I.uid = INN.image_uid \
-      LEFT JOIN User URA ON INN.recommend_uid = URA.uid AND URA.role = 'RADIOLOGIST' \
-      LEFT JOIN User UA ON INN.author_uid = UA.uid \
-      WHERE U.role = 'PATIENT' AND U.uid = ? \
-      GROUP BY I.uid, I.url, U.first_name, U.last_name",
-        request.params.uid
-      )
-      .catch((error) => {
-        console.log("user.service.images: ", error);
-      });
+    try {
+      const images = await request.server.pg.query(
+        `
+        SELECT
+          I.uid, I.url, I."createdAt", U.first_name, U.last_name,
+          UA_uploaded.title AS "uploadedBy_title",
+          UA_uploaded.first_name AS "uploadedBy_first_name",
+          UA_uploaded.last_name AS "uploadedBy_last_name",
+          CASE
+            WHEN COUNT(INN.note) > 0 THEN JSON_AGG(JSON_BUILD_OBJECT(
+            'uid', INN.author_uid, 'note', INN.note, 'full_name',
+            CONCAT(UA.title, ' ' , UA.first_name, ' ' , UA.last_name),
+            'role',
+            UA.role,
+            'recommendation',
+              CASE
+                WHEN URA.uid IS NOT NULL THEN CONCAT(URA.first_name, ' ' , URA.last_name)
+              ELSE NULL
+            END
+            ))
+            ELSE '[]'::json
+          END AS authors
+        FROM "User" U
+        JOIN "Image" I ON U.uid = I.uploaded_for
+        LEFT JOIN "User" UA_uploaded ON I.uploaded_by = UA_uploaded.uid
+        LEFT JOIN (
+          SELECT INN.uid, INN.note, INN.image_uid, INN.author_uid, INN."createdAt", INN.recommend_uid
+          FROM "ImageNote" INN
+          JOIN "User" UA ON INN.author_uid = UA.uid
+          WHERE UA.role IN ('PHYSICIAN', 'RADIOLOGIST')
+        ) AS INN ON I.uid = INN.image_uid
+        LEFT JOIN "User" URA ON INN.recommend_uid = URA.uid AND URA.role = 'RADIOLOGIST'
+        LEFT JOIN "User" UA ON INN.author_uid = UA.uid
+        WHERE U.role = 'PATIENT' AND U.uid = '${request.params.uid}'
+        GROUP BY I.uid, I.url, I."createdAt", U.first_name, U.last_name, UA_uploaded.title, UA_uploaded.first_name, UA_uploaded.last_name;
+    `
+      );
 
-    reply.send({ images });
+      reply.send({ images: images.rows });
+    } catch (error: unknown) {
+      console.log("user.service.images: ", error);
+      reply.send({ images: [] });
+    }
   };
 
   getRadiologists = async (request: FastifyRequest, reply: FastifyReply) => {
-    const radiologists = await request.server.prisma.$queryRaw`\
-      SELECT \
-        U.uid, U.title, U.first_name, U.last_name, U.email, U.profile_image_url, \
-        SC.bio, SC.expertise, SC.years_of_exp, \
-        AVG(R.rating) as average_rating \
-      FROM User U \
-      LEFT JOIN \
-        StaffCredentials SC ON U.uid = SC.uid \
-      LEFT JOIN \
-        Rating R ON U.uid = R.rated_uid \
-      WHERE U.role = 'RADIOLOGIST' \
-      GROUP BY \
-        U.uid, U.title, U.first_name, U.last_name, U.email, U.profile_image_url, \
-        SC.bio, SC.expertise, SC.years_of_exp`;
+    const result = await request.server.pg.query(`
+      SELECT
+        U.uid, U.title, U.first_name, U.last_name, U.email, U.profile_image_url,
+        SC.bio, SC.expertise, SC.years_of_exp,
+        AVG(R.rating) as average_rating
+      FROM "User" U
+      LEFT JOIN
+        "StaffCredentials" SC ON U.uid = SC.uid
+      LEFT JOIN
+        "Rating" R ON U.uid = R.rated_uid
+      WHERE U.role = 'RADIOLOGIST'
+      GROUP BY
+        U.uid, U.title, U.first_name, U.last_name, U.email, U.profile_image_url,
+        SC.bio, SC.expertise, SC.years_of_exp;
+  `);
 
-    reply.send({ radiologists });
+    reply.send({ radiologists: result.rows });
   };
 
   getMeetOurRadiologists = async (
     request: FastifyRequest,
     reply: FastifyReply
   ) => {
-    const radiologists = await request.server.prisma.$queryRaw`\
-      SELECT U.uid, U.title, U.first_name, U.last_name, U.profile_image_url, \
-        SC.expertise \
-      FROM User U \
-      LEFT JOIN StaffCredentials SC ON U.uid = SC.uid \
-      WHERE U.role = 'RADIOLOGIST' \
-      ORDER BY RAND() \
-      LIMIT 6`;
+    const result = await request.server.pg.query(
+      `
+      SELECT U.uid, U.title, U.first_name, U.last_name, U.profile_image_url,
+        SC.expertise
+      FROM "User" U
+      LEFT JOIN "StaffCredentials" SC ON U.uid = SC.uid
+      WHERE U.role = 'RADIOLOGIST'
+      ORDER BY RANDOM()
+      LIMIT 6
+    `
+    );
 
-    if (!radiologists) {
+    if (!result.rowCount) {
       return reply.send({ radiologists: [] });
     }
 
-    reply.send({ radiologists });
+    reply.send({ radiologists: result.rows });
   };
 
   getPatients = async (request: FastifyRequest, reply: FastifyReply) => {
-    const result = await request.server.prisma.user
-      .findFirst({
-        where: { uid: request.userUID },
-      })
-      .then(async (user) => {
-        if (!user) {
-          return reply.send({ patients: [] });
-        }
-
-        if (user.role === "RADIOLOGIST") {
-          return await request.server.prisma
-            .$queryRawUnsafe(
-              patientsAsRadiologistQuery,
-              request.userUID,
-              request.userUID
-            )
-            .catch((error) => {
-              console.log("user.service.patientsAsRadiologistQuery: ", error);
-            });
+    const result = await request.server.pg
+      .query(`SELECT role FROM "User" WHERE uid = '${request.userUID}';`)
+      .then(async (result) => {
+        if (result.rowCount === 1 && result.rows[0] === "RADIOLOGIST") {
+          return await patientsAsRadiologistQuery(
+            request.server.pg.pool,
+            request.userUID
+          );
         } else {
-          return await request.server.prisma
-            .$queryRawUnsafe(patientsAsPhysicianQuery, request.userUID)
-            .catch((error: unknown) => {
-              console.log("user.service.patientsAsPhysicianQuery: ", error);
-            });
+          return await patientsAsPhysicianQuery(
+            request.server.pg.pool,
+            request.userUID
+          );
         }
-      })
-      .catch((error) => {
-        console.log("user.service.getPatients: ", error);
-        reply.send({ patients: [] });
       });
+
+    if (result.length === 0) {
+      console.log("user.service.patients: ", result);
+      reply.send({ patients: [] });
+    }
 
     reply.send({ patients: result });
   };
@@ -508,72 +502,93 @@ export default class UserService implements IUserService {
   }
 } */
 
-const patientsAsRadiologistQuery =
-  "SELECT U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url, \
-        JSON_ARRAYAGG( \
-          JSON_OBJECT( \
-            'uid', I.uid, \
-            'url', I.url, \
-            'authors', IFNULL(authors, JSON_ARRAY()) \
-          ) \
-        ) AS images \
-        FROM User U \
-        JOIN PatientRelation PR ON U.uid = PR.patient_uid \
-      LEFT JOIN Image I ON U.uid = I.uploaded_for \
-      LEFT JOIN ( \
-        SELECT \
-          INN.image_uid, \
-          JSON_ARRAYAGG( \
-            JSON_OBJECT( \
-              'uid', INN.author_uid, \
-              'note', INN.note, \
-              'role', UA.role, \
-              'full_name', CONCAT(UA.title, ' ', UA.first_name, ' ', UA.last_name) \
-            ) \
-          ) AS authors \
-        FROM ImageNote INN \
-        JOIN User UA ON INN.author_uid = UA.uid \
-        WHERE UA.role IN ('PHYSICIAN', 'RADIOLOGIST') \
-        GROUP BY INN.image_uid \
-      ) AS authors_subquery ON I.uid = authors_subquery.image_uid \
-      WHERE \
-        PR.staff_uid = ? \
-        AND EXISTS ( \
-          SELECT 1 \
-          FROM Invoice inv \
-          WHERE inv.radiologist_uid = ? \
-          AND inv.image_uid = I.uid \
-          AND inv.paid = 1 \
-      ) \
-      GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url";
+const patientsAsRadiologistQuery = async (
+  pg: Pg.Pool,
+  uid: string | undefined
+) => {
+  const radiologists =
+    await pg.query(`SELECT U.uid, TO_CHAR(U.dob, 'MM-DD-YYYY') AS dob, U.first_name, U.last_name, U.email, U.profile_image_url,
+      COALESCE(
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'uid', I.uid,
+            'url', I.url,
+            'authors', COALESCE(authors_subquery.authors, '[]'::json)
+            )
+          ) FILTER (WHERE I.uid IS NOT NULL),
+        '[]'::json
+      ) AS images
+      FROM "User" U
+      JOIN "PatientRelation" PR ON U.uid = PR.patient_uid
+      LEFT JOIN "Image" I ON U.uid = I.uploaded_for
+      LEFT JOIN (
+        SELECT
+          INN.image_uid,
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'uid', INN.author_uid,
+              'note', INN.note,
+              'role', UA.role,
+              'full_name', CONCAT(UA.title, ' ', UA.first_name, ' ', UA.last_name)
+            )
+          ) AS authors
+        FROM "ImageNote" INN
+        JOIN "User" UA ON INN.author_uid = UA.uid
+        WHERE UA.role IN ('PHYSICIAN', 'RADIOLOGIST')
+        GROUP BY INN.image_uid
+      ) AS authors_subquery ON I.uid = authors_subquery.image_uid
+      WHERE
+        PR.staff_uid = '${uid}'
+        AND EXISTS (
+          SELECT 1
+          FROM "Invoice" inv
+          WHERE inv.radiologist_uid = '${uid}'
+          AND inv.image_uid = I.uid
+          AND inv.paid = true
+      )
+      GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url
+    `);
 
-const patientsAsPhysicianQuery =
-  "SELECT U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url, \
-        JSON_ARRAYAGG( \
-          JSON_OBJECT( \
-            'uid', I.uid, \
-            'url', I.url, \
-            'authors', IFNULL(authors, JSON_ARRAY()) \
-          ) \
-        ) AS images \
-        FROM User U \
-        JOIN PatientRelation PR ON U.uid = PR.patient_uid \
-      LEFT JOIN Image I ON U.uid = I.uploaded_for \
-      LEFT JOIN ( \
-        SELECT \
-          INN.image_uid, \
-          JSON_ARRAYAGG( \
-            JSON_OBJECT( \
-              'uid', INN.author_uid, \
-              'note', INN.note, \
-              'role', UA.role, \
-              'full_name', CONCAT(UA.title, ' ', UA.first_name, ' ', UA.last_name) \
-            ) \
-          ) AS authors \
-        FROM ImageNote INN \
-        JOIN User UA ON INN.author_uid = UA.uid \
-        WHERE UA.role IN ('PHYSICIAN', 'RADIOLOGIST') \
-        GROUP BY INN.image_uid \
-      ) AS authors_subquery ON I.uid = authors_subquery.image_uid \
-      WHERE PR.staff_uid = ? \
-      GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url";
+  return radiologists.rows;
+};
+
+const patientsAsPhysicianQuery = async (
+  pg: Pg.Pool,
+  uid: string | undefined
+) => {
+  const radiologists =
+    await pg.query(`SELECT U.uid, TO_CHAR(U.dob, 'MM-DD-YYYY') as dob, U.first_name, U.last_name, U.email, U.profile_image_url, \
+      COALESCE(
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'uid', I.uid,
+            'url', I.url,
+            'authors', COALESCE(authors_subquery.authors, '[]'::json)
+          )
+        ) FILTER (WHERE I.uid IS NOT NULL),
+        '[]'::json
+      ) AS images
+      FROM "User" U
+      JOIN "PatientRelation" PR ON U.uid = PR.patient_uid
+      LEFT JOIN "Image" I ON U.uid = I.uploaded_for
+      LEFT JOIN (
+        SELECT
+          INN.image_uid,
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'uid', INN.author_uid,
+              'note', INN.note,
+              'role', UA.role,
+              'full_name', CONCAT(UA.title, ' ', UA.first_name, ' ', UA.last_name)
+            )
+          ) AS authors
+        FROM "ImageNote" INN
+        JOIN "User" UA ON INN.author_uid = UA.uid
+        WHERE UA.role IN ('PHYSICIAN', 'RADIOLOGIST')
+        GROUP BY INN.image_uid
+      ) AS authors_subquery ON I.uid = authors_subquery.image_uid
+      WHERE PR.staff_uid = '${uid}'
+      GROUP BY U.uid, U.dob, U.first_name, U.last_name, U.email, U.profile_image_url`);
+
+  return radiologists.rows;
+};
