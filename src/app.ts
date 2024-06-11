@@ -36,7 +36,7 @@ const buildFastify = (opts?: { log?: boolean }) => {
   fastifyApp.register(middie);
 
   fastifyApp.get("/", (_request, reply) => {
-    API_VERSION && reply.header("Api-Version", API_VERSION);
+    if (API_VERSION) reply.header("Api-Version", API_VERSION);
     reply.send(`You've reached RadiologyArchive's ${WHICH_API} API!`);
   });
 
