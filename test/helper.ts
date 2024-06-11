@@ -62,6 +62,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   testApp.close();
-});
+}, 30000);
 
 export { testApp as app, buildLiveApp, compareArrayOfObjects };

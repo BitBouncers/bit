@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest, UserUIDParams } from "fastify";
 
+/** Middleware that allows user as the owner or staff users */
 export const isAuthorizedOrStaff = async (
   request: FastifyRequest<UserUIDParams>,
   reply: FastifyReply
