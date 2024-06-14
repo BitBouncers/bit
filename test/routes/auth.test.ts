@@ -185,7 +185,7 @@ describe("auth routes", () => {
     });
   });
 
-  describe.only("sign up", () => {
+  describe("sign up", () => {
     let request: FastifyRequest<AuthSignupBody | AuthSignupPhysician>;
     let reply: FastifyReply;
     let pg: PostgresDb & Record<string, PostgresDb>;
@@ -337,6 +337,8 @@ describe("auth routes", () => {
     });
 
     test("should send 'success: true' regardless the validity of the email", async () => {
+      jest.spyOn(firebase, "sendPasswordResetEmail").mockResolvedValueOnce();
+
       await authService.sendPasswordReset(
         request as FastifyRequest<AuthPasswordReset>,
         reply
