@@ -1,6 +1,6 @@
 # Radiology Archive's Backend
 
-The backend of Radiology Archive, built on [Fastify](https://fastify.dev/) and utilizing various technologies like [DrizzleORM](https://orm.drizzle.team/), [PlanetScale](https://planetscale.com/), [Firebase Auth & Storage](https://firebase.google.com/), and [Stripe](https://stripe.com/docs/development) — designed to manage and serve medical imaging data securely and handle user authentication and payment processing.
+The backend of Radiology Archive, built on [Fastify](https://fastify.dev/) and utilizing various technologies like [DrizzleORM](https://orm.drizzle.team/), [Supabase](https://supabase.com/), [Firebase Auth & Storage](https://firebase.google.com/), and [Stripe](https://stripe.com/docs/development) — designed to manage and serve medical imaging data securely and handle user authentication and payment processing.
 
 ## Documentation
 

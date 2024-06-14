@@ -1,4 +1,5 @@
-import { FastifyInstance } from "fastify";
+import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { RequestGenericInterface } from "fastify/types/request";
 import { default as buildFastify } from "../src/app";
 import {
   AUTH_TOKEN,
@@ -32,6 +33,27 @@ const compareArrayOfObjects: CompareArraysOfObjects<any> = (a, b) => {
   const obj2 = a.reduce((acc, obj) => ({ ...acc, ...obj }), {});
 
   return JSON.stringify(obj1) === JSON.stringify(obj2);
+};
+
+export const buildFastifyRequest = <T extends RequestGenericInterface>(
+  overrides: Partial<FastifyRequest<T>>
+): FastifyRequest<T> => {
+  return {
+    body: {},
+    params: {},
+    query: {},
+    headers: {},
+    server: {},
+    ...overrides,
+  } as FastifyRequest<T>;
+};
+
+export const buildFastifyReply = (): FastifyReply => {
+  const reply: Partial<FastifyReply> = {};
+  reply.code = jest.fn().mockReturnValue(reply);
+  reply.send = jest.fn().mockReturnValue(reply);
+  reply.status = jest.fn().mockReturnValue(reply);
+  return reply as FastifyReply;
 };
 
 const testApp = buildFastify({ log: false });

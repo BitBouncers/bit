@@ -557,7 +557,7 @@ const patientsAsPhysicianQuery = async (
   uid: string | undefined
 ) => {
   const radiologists =
-    await pg.query(`SELECT U.uid, TO_CHAR(U.dob, 'MM-DD-YYYY') as dob, U.first_name, U.last_name, U.email, U.profile_image_url, \
+    await pg.query(`SELECT U.uid, TO_CHAR(U.dob, 'MM-DD-YYYY') as dob, U.first_name, U.last_name, U.email, U.profile_image_url,
       COALESCE(
         JSON_AGG(
           JSON_BUILD_OBJECT(

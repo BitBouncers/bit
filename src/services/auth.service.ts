@@ -1,219 +1,47 @@
+import crypto from "crypto";
+import {
+  AuthAddPatient,
+  AuthLoginBody,
+  AuthLoginPortal,
+  AuthPasswordReset,
+  AuthSignupBody,
+  FastifyReply,
+  FastifyRequest,
+} from "fastify";
 import { FirebaseError } from "firebase/app";
-import { login } from "src/config/firebase";
-
-/* export async function addPatient(request, reply) {
-  const { email, dob, first_name, last_name, title } = request.body;
-
-  const emailExists = await dbConn
-    .execute("SELECT uid FROM User WHERE email = ?", [email])
-    .catch((error) => {
-      console.log(error.code, error.message);
-      return reply.status(409).send({ msg: "Unable to add patient" });
-    });
-
-  if (emailExists.length > 0) {
-    const patient_uid = emailExists[0].uid;
-
-    try {
-      const patientRelations = await sql`
-        SELECT COUNT(*)::int AS count
-        FROM "PatientRelation"
-        WHERE
-          patient_uid = ${patient_uid}
-        AND EXISTS (
-          SELECT uid FROM "User"
-          WHERE role = 'PHYSICIAN'
-          AND uid = "PatientRelation".staff_uid
-        )
-      `;
-
-      if (patientRelations.rows[0]["count(*)"] > 1) {
-        return reply.status(409).send({
-          errors: [
-            {
-              msg: "This patient is already assigned to another physician.",
-            },
-          ],
-        });
-      }
-
-      await dbConn.execute(
-        "INSERT IGNORE INTO PatientRelation(patient_uid, staff_uid) VALUES(?, ?)",
-        [emailExists.rows[0].uid, request.userUID]
-      );
-
-      notify(
-        emailExists.rows[0].uid,
-        request.userUID,
-        "You have been added as a patient."
-      );
-
-      return reply.send({ success: true, msg: "Successfully added patient" });
-    } catch (error) {
-      console.log("auth.addPatient: ", error.message);
-      return reply.status(409).send({ msg: "Unable to add patient" });
-    }
-  }
-
-  const role = "PATIENT";
-  try {
-    await adminAuth
-      .createUser({
-        email: email,
-        password: crypto.randomBytes(18).toString("hex"),
-      })
-      .then(async (userRecord) => {
-        await sql`INSERT INTO User(uid, email, dob, first_name, last_name, title, role) VALUES(${userRecord.uid}, ${email}, ${dob}, ${first_name}, ${last_name}, ${title}, ${role})`.then(
-          async () => {
-            await adminAuth
-              .updateUser(userRecord.uid, {
-                displayName: title ? `${title} ${first_name} ${last_name}` : `${first_name} ${last_name}`,
-              })
-              .then(() => {
-                sendPasswordResetEmail(auth, email).then(() => {
-                  console.log("Password reset email sent to: ", email);
-                  reply.status(200).send({
-                    msg: "Successfully added new patient",
-                  });
-                });
-              })
-              .catch((error) =>
-                console.log("Error updating displayName: ", error)
-              );
-          });
-        await dbConn
-          .execute(
-            "INSERT IGNORE INTO PatientRelation(patient_uid, staff_uid) VALUES(?, ?)",
-            [userRecord.uid, request.userUID]
-          )
-          .catch((error) =>
-            console.log("auth.service.addPatient: ", error.code, error.message)
-          );
-      });
-  } catch (error) {
-    console.log("Error inserting new user:", error.message);
-    reply.status(409).send({
-      errors: [{ msg: "Unable to add patient", path: "auth/add-patient" }],
-    });
-  }
-} */
-
-import { AuthLoginBody, FastifyReply, FastifyRequest } from "fastify";
-
-/* export async function portal(request, reply) {
-  const { role } = request.params;
-  const { email } = request.body;
-  try {
-    const result = await dbConn.execute(
-      "SELECT role FROM User WHERE email = ?",
-      [email]
-    );
-    if (role.toUpperCase() === result.rows[0].role) {
-      return reply.status(200).send({ success: true });
-    } else {
-      return reply.status(409).send({ msg: "Unable to access portal" });
-    }
-  } catch (error) {
-    console.log("auth.service.portal: ", error);
-    reply.status(409).send({ msg: "Unable to access portal" });
-  }
-} */
-
-/* export async function sendResetPassword(request, reply) {
-  try {
-    await sendPasswordResetEmail(auth, request.body.email);
-    reply.send({ success: true });
-  } catch (error) {
-    console.log("user.service.resetPassword: ", error);
-    reply.send({ success: false });
-  }
-} */
-
-/* export async function signup(request, reply) {
-  const { email, password, dob, first_name, last_name, title, role } = request.body;
-  const isPhysician = request.body.role === "physician";
-
-  if (isPhysician) {
-    await adminAuth
-      .updateUser(request.userUID, {
-        email: email,
-        password: password,
-      })
-      .then((userRecord) => {
-        sql`UPDATE User SET email = ${email}, title = ${title}, claimed_as_physician = true, role = 'PHYSICIAN', title = 'Dr.' WHERE uid = ${userRecord.uid}`
-          .then((result) => {
-            if (result.rowsAffected > 0) {
-              reply
-                .status(200)
-                .send({ msg: "Successfully created physician account" });
-            }
-            adminAuth
-              .updateUser(userRecord.uid, {
-                displayName: title + " " + first_name + " " + last_name,
-              })
-              .catch((error) => console.log("Error updating displayName: ", error));
-          })
-          .catch((error) => {
-            console.log("Error adding physician: ", error.body.message);
-            return reply.status(409).send({
-              errors: [
-                { msg: "Unable to create account", path: "auth/signup" },
-              ],
-            });
-          });
-      })
-      .catch((error) => {
-        console.log("Error creating new user:", error.errorInfo);
-        return reply
-          .status(409)
-          .send({ errors: [{ msg: error.message, path: "auth/signup" }] });
-      });
-  } else {
-    await adminAuth
-      .createUser({
-        email: email,
-        password: password,
-      })
-      .then((userRecord) => {
-        // Create a new user in the planetscale database since we use firebase auth
-        // for authentication and planetscale for storing user data
-        sql`
-          INSERT INTO
-            User(uid, email, dob, first_name, last_name, title, role)
-          VALUES(${userRecord.uid}, ${email}, ${dob}, ${first_name}, ${last_name}, ${title}, ${role})`
-          .then((result) => {
-            if (result.rowsAffected > 0) {
-              reply.status(200).send({ msg: "Successfully created new user" });
-            }
-            adminAuth
-              .updateUser(userRecord.uid, {
-                displayName: title ? `${title} ${first_name} ${last_name}` : `${first_name} ${last_name}`,
-              })
-              .catch((error) => console.log("Error updating displayName: ", error));
-          })
-          .catch((error) => {
-            console.log("Error inserting new user:", error.body.message);
-            reply.status(409).send({
-              errors: [
-                { msg: "Unable to create account", path: "auth/signup" },
-              ],
-            });
-          });
-      })
-      .catch((error) => {
-        console.log("Error creating new user:", error.errorInfo);
-        return reply
-          .status(409)
-          .send({ errors: [{ msg: error.message, path: "auth/signup" }] });
-      });
-  }
-} */
+import {
+  adminAuth,
+  auth,
+  login,
+  sendPasswordResetEmail,
+} from "src/config/firebase";
+import { notify } from "src/utils/notify";
 
 interface IAuthService {
+  addPatient: (
+    request: FastifyRequest<AuthAddPatient>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
   loginThroughFirebase: (
     request: FastifyRequest<AuthLoginBody>,
     reply: FastifyReply
   ) => Promise<FirebaseError | bit.AuthLoginResponse | undefined>;
+
+  portal: (
+    request: FastifyRequest<AuthLoginPortal>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  sendPasswordReset: (
+    request: FastifyRequest<AuthPasswordReset>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  signup: (
+    request: FastifyRequest<AuthSignupBody>,
+    reply: FastifyReply
+  ) => Promise<void>;
 
   verifyToken: (
     request: FastifyRequest<AuthLoginBody>,
@@ -222,6 +50,127 @@ interface IAuthService {
 }
 
 export default class AuthService implements IAuthService {
+  addPatient = async (
+    request: FastifyRequest<AuthAddPatient>,
+    reply: FastifyReply
+  ) => {
+    const { email, dob, first_name, last_name, title } = request.body;
+
+    const emailExists = await request.server.pg
+      .query(`SELECT uid FROM "User" WHERE email = '${email}'`)
+      .catch((error: unknown) => {
+        console.log("auth.addPatient.emailExists: ", error);
+        return reply.code(409).send({ msg: "Unable to add patient" });
+      });
+
+    console.log(emailExists);
+
+    if (emailExists.rowCount) {
+      const patient_uid = emailExists.rows[0].uid;
+
+      try {
+        const patientRelations = await request.server.pg.query(`
+        SELECT COUNT(*)::int AS count
+        FROM "PatientRelation"
+        WHERE
+          patient_uid = '${patient_uid}'
+        AND EXISTS (
+          SELECT uid FROM "User"
+          WHERE role = 'PHYSICIAN'
+          AND uid = "PatientRelation".staff_uid
+        )
+      `);
+
+        if (patientRelations.rowCount) {
+          return reply.code(409).send({
+            errors: [
+              {
+                msg: "This patient is already assigned to another physician.",
+              },
+            ],
+          });
+        }
+
+        await request.server.pg.query(`
+        INSERT INTO "PatientRelation" (patient_uid, staff_uid)
+        VALUES ('${emailExists.rows[0].uid}', '${request.userUID}')
+        ON CONFLICT (patient_uid, staff_uid) DO NOTHING
+      `);
+
+        if (request.userUID) {
+          notify(request.server.pg.pool, {
+            recipient: emailExists.rows[0].uid,
+            sender: request.userUID,
+            message: "You have been added as a patient.",
+          });
+        } else {
+          console.log(
+            "auth.addpatient: unable to notify, missing request.userUID"
+          );
+        }
+
+        return reply.send({ success: true, msg: "Successfully added patient" });
+      } catch (error: unknown) {
+        console.log("auth.addPatient: ", error);
+        return reply.code(409).send({ msg: "Unable to add patient" });
+      }
+    }
+
+    const role = "PATIENT";
+    try {
+      await adminAuth
+        .createUser({
+          email: email,
+          password: crypto.randomBytes(18).toString("hex"),
+        })
+        .then(async (userRecord) => {
+          await request.server.pg
+            .query(
+              `
+              INSERT INTO "User" (uid, email, dob, first_name, last_name, title, role)
+              VALUES ('${userRecord.uid}', '${email}', '${dob}', '${first_name}',
+                      '${last_name}', '${title}', '${role}')
+              `
+            )
+            .then(async () => {
+              await adminAuth
+                .updateUser(userRecord.uid, {
+                  displayName: title
+                    ? `${title} ${first_name} ${last_name}`
+                    : `${first_name} ${last_name}`,
+                })
+                .then(() => {
+                  sendPasswordResetEmail(auth, email).then(() => {
+                    console.log("Password reset email sent to: ", email);
+                    reply.code(200).send({
+                      msg: "Successfully added new patient",
+                    });
+                  });
+                })
+                .catch((error: unknown) =>
+                  console.log("Error updating displayName: ", error)
+                );
+            });
+          await request.server.pg
+            .query(
+              `INSERT IGNORE INTO PatientRelation(patient_uid, staff_uid) VALUES('${userRecord.uid}', '${request.userUID}')`
+            )
+            .catch((error) =>
+              console.log(
+                "auth.service.addPatient: ",
+                error.code,
+                error.message
+              )
+            );
+        });
+    } catch (error: unknown) {
+      console.log("Error inserting new user:", error);
+      reply.code(409).send({
+        errors: [{ msg: "Unable to add patient", path: "auth/add-patient" }],
+      });
+    }
+  };
+
   loginThroughFirebase = async (
     request: FastifyRequest<AuthLoginBody>,
     reply: FastifyReply
@@ -238,6 +187,141 @@ export default class AuthService implements IAuthService {
     }
 
     reply.send(res);
+  };
+
+  portal = async (
+    request: FastifyRequest<AuthLoginPortal>,
+    reply: FastifyReply
+  ) => {
+    try {
+      const { role } = request.params;
+      const { email } = request.body;
+
+      const result = await request.server.pg.query(
+        `SELECT role FROM "User" WHERE email = '${email}'`
+      );
+
+      if (
+        result.rowCount &&
+        result.rowCount > 0 &&
+        result.rows[0].role &&
+        role.toUpperCase() === result.rows[0].role
+      ) {
+        return reply.code(200).send({ success: true });
+      } else {
+        return reply.code(409).send({ msg: "Unable to access portal" });
+      }
+    } catch (error) {
+      console.log("auth.service.portal: ", error);
+      reply.code(409).send({ msg: "Unable to access portal" });
+    }
+  };
+
+  sendPasswordReset = async (
+    request: FastifyRequest<AuthPasswordReset>,
+    reply: FastifyReply
+  ) => {
+    try {
+      await sendPasswordResetEmail(auth, request.body.email);
+      reply.send({ success: true });
+    } catch (error) {
+      console.log("user.service.resetPassword: ", error);
+      reply.send({ success: false });
+    }
+  };
+
+  signup = async (
+    request: FastifyRequest<AuthSignupBody>,
+    reply: FastifyReply
+  ) => {
+    const { email, password, dob, first_name, last_name, title, role } =
+      request.body;
+    const isPhysician = role === "physician";
+
+    if (isPhysician) {
+      await adminAuth
+        .updateUser(request.userUID as string, {
+          email: email,
+          password: password,
+        })
+        .then((userRecord) => {
+          request.server.pg
+            .query(
+              `UPDATE User SET email = '${email}', title = '${title}', claimed_as_physician = true, role = 'PHYSICIAN', title = 'Dr.' WHERE uid = '${userRecord.uid}'`
+            )
+            .then((result) => {
+              if (result.rowCount && result.rowCount > 0) {
+                reply.send({ msg: "Successfully created physician account" });
+              }
+              adminAuth
+                .updateUser(userRecord.uid, {
+                  displayName: title + " " + first_name + " " + last_name,
+                })
+                .catch((error) =>
+                  console.log("Error updating displayName: ", error)
+                );
+            })
+            .catch((error) => {
+              console.log("Error adding physician: ", error.detail);
+              return reply.code(409).send({
+                errors: [
+                  { msg: "Unable to create account", path: "auth/signup" },
+                ],
+              });
+            });
+        })
+        .catch((error) => {
+          console.log("Error creating new user: ", error.errorInfo);
+          return reply
+            .code(409)
+            .send({ errors: [{ msg: error.message, path: "auth/signup" }] });
+        });
+    } else {
+      await adminAuth
+        .createUser({
+          email: email,
+          password: password,
+        })
+        .then((userRecord) => {
+          // Create a new user in the supabase db since we use firebase auth
+          // for authentication and supabase for storing user data
+          request.server.pg
+            .query(
+              `
+          INSERT INTO
+            "User" (uid, email, dob, first_name, last_name, title, role)
+          VALUES ('${userRecord.uid}', '${email}', '${dob}', '${first_name}', '${last_name}', '${title}', '${role}')`
+            )
+            .then((result) => {
+              if (result.rowCount) {
+                reply.send({ msg: "Successfully created new user" });
+              }
+              adminAuth
+                .updateUser(userRecord.uid, {
+                  displayName: title
+                    ? `${title} ${first_name} ${last_name}`
+                    : `${first_name} ${last_name}`,
+                })
+                .catch((error) =>
+                  console.log("Error updating displayName: ", error)
+                );
+            })
+            .catch((error) => {
+              console.log("Error inserting new user:", error.detail);
+              reply.code(409).send({
+                errors: [
+                  { msg: "Unable to create account", path: "auth/signup" },
+                ],
+              });
+            });
+        })
+        .catch((error) => {
+          console.log("Error creating new user: ", error.errorInfo);
+          reply
+            .code(409)
+            .send({ errors: [{ msg: error.message, path: "auth/signup" }] });
+        });
+    }
   };
 
   verifyToken = async (_request: FastifyRequest, reply: FastifyReply) => {

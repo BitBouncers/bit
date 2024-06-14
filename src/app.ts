@@ -2,6 +2,7 @@ import autoLoad from "@fastify/autoload";
 import cors from "@fastify/cors";
 import middie from "@fastify/middie";
 import postgres from "@fastify/postgres";
+import ajvKeywords from "ajv-keywords";
 import Fastify from "fastify";
 import { join } from "path";
 import { API_VERSION, DATABASE_URL, NODE_ENV } from "./utils/environment";
@@ -24,6 +25,9 @@ const buildFastify = (opts?: { log?: boolean }) => {
   }
 
   const fastifyApp = Fastify({
+    ajv: {
+      plugins: [ajvKeywords],
+    },
     logger: opts?.log ?? NODE_ENV !== "production",
   });
 

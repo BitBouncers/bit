@@ -46,40 +46,6 @@ async function checkPatientExists(uid, { req }) {
     });
 }
 
-async function checkPhysicianExistsInHospital(hospital, { req }) {
-  if (req.body.role === "physician") {
-    await sql`
-      SELECT
-        U.uid, U.first_name, U.last_name, U.dob, U.claimed_as_physician
-      FROM "User" AS U
-      JOIN
-        "HospitalPhysician" AS HP ON U.uid = HP.physician_uid
-      WHERE HP.hospital_uid = ${hospital}
-      AND
-        U.first_name = ${req.body.first_name}
-      AND
-        U.last_name = ${req.body.last_name}
-      AND
-        U.dob = ${req.body.dob}
-      AND
-        U.claimed_as_physician = 'false'
-      `
-      .then((result) => {
-        if (result.count === 0) {
-          return Promise.reject();
-        } else if (result[0].claimed_as_physician === 1) {
-          return Promise.reject();
-        } else if (result[0].claimed_as_physician === 0) {
-          req.userUID = result[0].uid;
-          return Promise.resolve(req);
-        } else {
-          return Promise.reject();
-        }
-      })
-      .catch((error) => console.log(error.code, error.message));
-  }
-  return Promise.resolve();
-}
 
 async function checkRadiologistExists(uid, { req }) {
   await sql`SELECT uid FROM "User" WHERE uid = ${uid}`
@@ -187,55 +153,6 @@ export const loginSchema = checkSchema(
   ["body"]
 );
 
-export const signupSchema = checkSchema(
-  {
-    email: {
-      emailExists: {
-        bail: true,
-        custom: checkEmailExists,
-        errorMessage: "This email is already in use",
-      },
-      isEmail: {
-        trim: true,
-        errorMessage: "Invalid email",
-      },
-    },
-    password: {
-      isLength: {
-        options: { min: 8 },
-        errorMessage: "Password must be at least 8 characters",
-      },
-      notEmpty: {
-        errorMessage: "Password is required",
-      },
-    },
-    dob: { isISO8601: { errorMessage: "Invalid date of birth" } },
-    first_name: { notEmpty: { errorMessage: "First name is required" } },
-    last_name: { notEmpty: { errorMessage: "Last name is required" } },
-    title: { optional: true },
-    role: {
-      default: "patient",
-      toLowerCase: true,
-      isAlpha: {
-        errorMessage: "Invalid role",
-      },
-      isIn: {
-        options: [["patient", "radiologist", "physician"]],
-        errorMessage: "Invalid role",
-      },
-    },
-    hospital: {
-      optional: true,
-      physicianExists: {
-        bail: true,
-        custom: checkPhysicianExistsInHospital,
-        errorMessage: "Account already exists or physician not found in hospital",
-      },
-    },
-  },
-  ["body"]
-);
-
 export const invoiceSchema = checkSchema({
   uid: {
     in: ["params"],
@@ -304,22 +221,6 @@ export const paySchema = checkSchema(
         bail: true,
         custom: checkInvoicePaid,
         errorMessage: "Invoice has already been paid",
-      },
-    },
-  },
-  ["body"]
-);
-
-export const portalSchema = checkSchema(
-  {
-    email: {
-      notEmpty: {
-        bail: true,
-        errorMessage: "Email is required",
-      },
-      isEmail: {
-        trim: true,
-        errorMessage: "Invalid email",
       },
     },
   },
@@ -456,16 +357,73 @@ export const updateProfileSchema = checkSchema({
       },
     },
   },
-});
+}); */
 
-export const sendResetPasswordSchema = checkSchema(
-  {
-    email: {
-      isEmail: {
-        bail: true,
-        errorMessage: "Invalid email",
+export const portalSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        email: {
+          type: "string",
+          format: "email",
+        },
       },
+      required: ["email"],
     },
   },
-  ["body"]
-); */
+  additionalProperties: false,
+};
+
+export const sendPasswordResetSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        email: {
+          type: "string",
+          format: "email",
+        },
+      },
+      required: ["email"],
+    },
+  },
+  additionalProperties: false,
+};
+
+export const signupSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        email: { type: "string" },
+        password: {
+          type: "string",
+          minLength: 8,
+        },
+        dob: {
+          type: "string",
+          pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+        },
+        first_name: {
+          type: "string",
+          minLength: 1,
+        },
+        last_name: {
+          type: "string",
+          minLength: 1,
+        },
+        role: {
+          type: "string",
+          transform: ["trim", "toLowerCase"],
+          default: "patient",
+          enum: ["patient", "radiologist", "physician"],
+        },
+        hospital: { type: "string" },
+        title: { type: "string" },
+      },
+    },
+    required: ["email", "password", "dob", "first_name", "last_name", "role"],
+  },
+  additionalProperties: false,
+};

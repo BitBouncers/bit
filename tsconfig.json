@@ -16,6 +16,6 @@
     "outDir": "./dist",
     "types": ["node", "jest"],
   },
-  "include": ["src"],
+  "include": ["src", "test"],
   "exclude": ["dist", "node_modules"],
 }
