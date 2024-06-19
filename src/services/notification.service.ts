@@ -28,19 +28,20 @@ export default class NotificationService implements INotificationService {
         CASE
           WHEN read THEN 1
           ELSE 0
-        END AS read,
+        END AS "read",
         uid, timestamp, message, "createdAt", "to"
       FROM
-        "Notification" WHERE recipient_uid = ${request.userUID}
+        "Notification" WHERE recipient_uid = '${request.userUID}'
       ORDER BY timestamp DESC
     `);
       if (rows) {
-        reply.status(200).send(rows);
+        reply.code(200).send(rows);
       } else {
-        reply.status(204);
+        reply.code(204);
       }
     } catch (error) {
       console.log("notification.service.polling: ", error);
+      reply.code(204);
     }
   };
 
@@ -50,19 +51,21 @@ export default class NotificationService implements INotificationService {
   ) => {
     const { read } = request.body;
 
-    if (read.length === 0) return reply.status(204);
+    if (read.length === 0) return reply.code(204);
 
     try {
       const result = await request.server.pg.query(
-        `UPDATE "Notification" SET read = true WHERE uid = ANY(${read}::uuid[])`
+        // eslint-disable-next-line quotes
+        'UPDATE "Notification" SET read = true WHERE uid = ANY($1::uuid[])',
+        [read]
       );
-      return reply.send({
+      reply.send({
         success: result.rowCount === read.length ? true : false,
         read,
       });
     } catch (error) {
       console.log("notification.service.read: ", error);
-      return reply.status(500).send({ message: "Internal server error" });
+      reply.code(500).send({ message: "Internal server error" });
     }
   };
 }

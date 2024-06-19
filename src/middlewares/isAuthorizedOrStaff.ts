@@ -2,7 +2,7 @@ import { FastifyReply, FastifyRequest, UserUIDParams } from "fastify";
 
 /** Middleware that allows user as the owner or staff users */
 export const isAuthorizedOrStaff = async (
-  request: FastifyRequest<UserUIDParams>,
+  request: FastifyRequest,
   reply: FastifyReply
 ) => {
   try {
@@ -18,7 +18,8 @@ export const isAuthorizedOrStaff = async (
     // or if the user is a physician or radiologist
     const isAuthorizedOrStaff =
       ["PHYSICIAN", "RADIOLOGIST"].includes(user.rows[0].role) ||
-      request.userUID === request.params?.uid || // invoices api
+      request.userUID ===
+        (request as FastifyRequest<UserUIDParams>).params.uid || // invoices api
       request.userUID === user.rows[0].uid; // match firebase auth uid to our db uid
 
     if (!isAuthorizedOrStaff) {

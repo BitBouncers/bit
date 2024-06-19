@@ -261,28 +261,6 @@ export const rateRadiologistSchema = checkSchema(
   ["body"]
 );
 
-export const readNotificationSchema = checkSchema(
-  {
-    read: {
-      isArray: {
-        bail: true,
-        errorMessage: "read must be an array",
-      },
-    },
-  },
-  ["body"]
-);
-
-export const updateImageNoteSchema = checkSchema({
-  image_uid: {
-    imageExists: {
-      bail: true,
-      custom: checkImageExists,
-      errorMessage: "Image does not exist",
-    },
-  },
-});
-
 export const uploadImageSchema = checkSchema({
   patient: {
     notEmpty: {
@@ -370,6 +348,60 @@ export const portalSchema = {
         },
       },
       required: ["email"],
+    },
+  },
+  additionalProperties: false,
+};
+
+export const readNotificationSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        read: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+      },
+      required: ["read"],
+    },
+  },
+  additionalProperties: false,
+};
+
+export const readNotificationSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        read: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+      },
+      required: ["read"],
+    },
+  },
+  additionalProperties: false,
+};
+
+export const readNotificationSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        read: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+      },
+      required: ["read"],
     },
   },
   additionalProperties: false,
