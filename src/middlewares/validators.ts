@@ -459,3 +459,25 @@ export const signupSchema = {
   },
   additionalProperties: false,
 };
+
+export const updateImageNoteSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        note: { type: "string" },
+      },
+    },
+    params: {
+      type: "object",
+      properties: {
+        image_uid: {
+          type: "string",
+          format: "uuid",
+        },
+      },
+    },
+    required: ["image_uid", "note"],
+  },
+  additionalProperties: false,
+};

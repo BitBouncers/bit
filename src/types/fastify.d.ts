@@ -3,6 +3,8 @@ import { RequestGenericInterface } from "fastify";
 
 declare module "fastify" {
   interface FastifyRequest {
+    patientName?: string;
+    patientEmail?: string;
     stripeID?: string;
     userUID?: string;
     body?: { image: string };
@@ -56,6 +58,15 @@ declare module "fastify" {
   interface AuthSignupPhysician extends RequestGenericInterface {
     Body: AuthSignupBody["Body"] & {
       hospital: string | null;
+    };
+  }
+
+  interface ImageNoteUpdate extends RequestGenericInterface {
+    Body: {
+      note: string;
+    };
+    Params: {
+      image_uid: string;
     };
   }
 

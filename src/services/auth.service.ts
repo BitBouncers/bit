@@ -63,8 +63,6 @@ export default class AuthService implements IAuthService {
         return reply.code(409).send({ msg: "Unable to add patient" });
       });
 
-    console.log(emailExists);
-
     if (emailExists.rowCount) {
       const patient_uid = emailExists.rows[0].uid;
 
