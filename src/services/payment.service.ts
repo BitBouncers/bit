@@ -38,9 +38,10 @@ export default class PaymentService implements IPaymentService {
         !request.userUID ||
         typeof request.userUID !== "string"
       ) {
-        return reply.send({ success: false, msg: "Error creating invoice." });
+        return reply
+          .code(422)
+          .send({ success: false, msg: "Error creating invoice." });
       }
-
       await stripe.invoiceItems
         .create({
           customer: request.stripeID,
@@ -48,7 +49,6 @@ export default class PaymentService implements IPaymentService {
           currency: "usd",
           description: "Professional opinion from a radiologist",
         })
-
         .then((invoiceItems) => {
           return stripe.invoices.create({
             customer: invoiceItems.customer as string,
@@ -65,8 +65,8 @@ export default class PaymentService implements IPaymentService {
             },
           });
         })
-        .then((invoice) => {
-          stripe.invoices.sendInvoice(invoice.id).then(() => {
+        .then(async (invoice) => {
+          await stripe.invoices.sendInvoice(invoice.id).then(() => {
             request.server.pg
               .query(
                 `
@@ -82,7 +82,7 @@ export default class PaymentService implements IPaymentService {
                   error.message
                 )
               );
-            reply.status(200).send({
+            reply.code(200).send({
               success: true,
               msg: "Successfully created invoice.",
             });
@@ -90,9 +90,7 @@ export default class PaymentService implements IPaymentService {
         });
     } catch (error: unknown) {
       console.log("Error creating invoice: ", error);
-      reply
-        .status(500)
-        .send({ success: false, msg: "Error creating invoice." });
+      reply.code(500).send({ success: false, msg: "Error creating invoice." });
     }
   };
 
@@ -108,15 +106,15 @@ export default class PaymentService implements IPaymentService {
       );
 
       if (!result.rowCount) {
-        return reply.status(200).send({ data: [] });
+        return reply.code(200).send({ data: [] });
       }
 
-      reply.status(200).send({ data: result.rows });
+      reply.code(200).send({ data: result.rows });
     } catch (error: unknown) {
-      console.log("Error creating invoice: ", error);
+      console.log("Error retrieving invoices: ", error);
       reply
-        .status(500)
-        .send({ success: false, msg: "Error creating invoice." });
+        .code(500)
+        .send({ success: false, msg: "Error retrieving invoices." });
     }
   };
 
@@ -134,14 +132,14 @@ export default class PaymentService implements IPaymentService {
       );
 
       if (!result.rowCount) {
-        return reply.status(200).send({ data: [] });
+        return reply.code(200).send({ data: [] });
       }
 
-      reply.status(200).send({ data: result.rows });
+      reply.code(200).send({ data: result.rows });
     } catch (error: unknown) {
-      console.log("Error fetching invoices: ", error);
-      reply.status(409).send({
-        msg: "Unable to fetch invoices",
+      console.log("Error fetching invoices o f user: ", error);
+      reply.code(409).send({
+        msg: "Unable to fetch invoices of user",
         path: request.originalUrl,
       });
     }
@@ -157,18 +155,18 @@ export default class PaymentService implements IPaymentService {
       `);
 
       if (result.rowCount === 0) {
-        return reply.status(200).send({
+        return reply.code(200).send({
           success: true,
           msg: "Invoice has already been paid or does not exist",
         });
       }
 
       reply
-        .status(200)
+        .code(200)
         .send({ success: true, msg: "Successfully voided invoice" });
     } catch (error: unknown) {
       console.log("Error voiding invoice: ", error);
-      reply.status(409).send({
+      reply.code(409).send({
         msg: "Unable to void invoice",
         path: request.originalUrl,
       });

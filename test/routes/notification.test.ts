@@ -85,7 +85,7 @@ describe("notification routes", () => {
       expect(reply.code).toHaveBeenCalledWith(204);
     });
 
-    test.only("polling encounters an error", async () => {
+    test("polling encounters an error", async () => {
       (pg.query as jest.Mock).mockRejectedValueOnce(
         new Error("Polling encountered an error.")
       );

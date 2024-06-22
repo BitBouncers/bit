@@ -1,53 +1,81 @@
-/* import stripe from "../config/stripe.js";
-import dbConn from "../config/db.js";
+import { FastifyReply, FastifyRequest, PaymentInvoiceProcess } from "fastify";
+import stripe from "../config/stripe";
 
-async function createStripeCustomer(req, res, next) {
-  await sql`SELECT stripe_id FROM "StripeUser" WHERE patient_uid = ${req.userUID}`.then((result) => {
-    if (result.count > 0) {
-      req.stripeID = result[0].stripe_id;
-      next();
-    } else {
-      try {
-        sql`SELECT email, first_name, last_name FROM "User" WHERE uid = ${req.userUID}`.then((result) => {
-          const { email, first_name, last_name } = result[0];
-          req.patientEmail = email;
-          req.patientName = first_name + " " + last_name;
+/** Middleware that checks if the image requested for an invoice exists */
+export const createStripeCustomer = async (
+  request: FastifyRequest<PaymentInvoiceProcess>,
+  reply: FastifyReply
+) => {
+  await request.server.pg
+    .query(
+      `SELECT stripe_id FROM "StripeUser" WHERE patient_uid = '${request.userUID}'`
+    )
+    .then((result) => {
+      if (result.rowCount && result.rowCount > 0) {
+        request.stripeID = result.rows[0].stripe_id;
+      } else {
+        try {
+          request.server.pg
+            .query(
+              `SELECT email, first_name, last_name FROM "User" WHERE uid = '${request.userUID}'`
+            )
+            .then((result) => {
+              const { email, first_name, last_name } = result.rows[0];
+              request.patientEmail = email;
+              request.patientName = first_name + " " + last_name;
 
-          stripe.customers
-            .create({
-              email: req.patientEmail,
-              name: req.patientName,
-              metadata: {
-                patientUID: req.userUID,
-                radiologistUID: req.params.uid,
-              },
-            })
-            .then((customer) => {
-              if (customer.id) {
-                sql`
-                        INSERT IGNORE INTO StripeUser(patient_uid, stripe_id) VALUES(${req.userUID}, ${customer.id})
-                      `
-                  .then((result) => {
-                    if (result.count > 0) {
-                      req.stripeID = customer.id;
-                      console.log("Stripe user created");
-                      next();
-                    }
-                  })
-                  .catch((error) => {
-                    console.log(error);
-                    res.status(500).json({ msg: "Error creating customer" });
-                  });
-              } else {
-                res.status(500).json({ msg: "Error creating customer" });
+              if (
+                (typeof request.patientEmail !== "string" &&
+                  request.patientEmail === undefined) ||
+                (typeof request.patientName !== "string" &&
+                  request.patientName === undefined) ||
+                (typeof request.userUID !== "string" &&
+                  request.userUID === undefined)
+              ) {
+                return reply
+                  .code(500)
+                  .send({ success: false, msg: "Error creating customer" });
               }
-            });
-        });
-      } catch (error) {
-        console.log("createStripeCustomer: ", error);
-      }
-    }
-  });
-}
 
-export default createStripeCustomer; */
+              stripe.customers
+                .create({
+                  email: request.patientEmail,
+                  name: request.patientName,
+                  metadata: {
+                    patientUID: request.userUID,
+                    radiologistUID: request.params.uid,
+                  },
+                })
+                .then((customer) => {
+                  if (customer.id) {
+                    request.server.pg
+                      .query(
+                        `INSERT IGNORE INTO "StripeUser" (patient_uid, stripe_id) VALUES('${request.userUID}', '${customer.id}')`
+                      )
+                      .then((result) => {
+                        if (result.rowCount) {
+                          request.stripeID = customer.id;
+                          console.log("Stripe user created");
+                        }
+                      })
+                      .catch((error) => {
+                        console.log(error);
+                        reply
+                          .code(500)
+                          .send({ msg: "Error creating customer" });
+                      });
+                  } else {
+                    reply
+                      .code(500)
+                      .send({ success: false, msg: "Error creating customer" });
+                  }
+                });
+            });
+        } catch (error) {
+          console.log("createStripeCustomer: ", error);
+        }
+      }
+    });
+};
+
+export default createStripeCustomer;

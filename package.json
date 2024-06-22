@@ -13,7 +13,7 @@
     "prettier-check": "prettier --check 'src/**/*.ts' 'test/**/*.ts'",
     "prettier-fix": "prettier --write 'src/**/*.ts' 'test/**/*.ts'",
     "start": "cross-env NODE_ENV=production tsx dist/src",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest"
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --silent"
   },
   "engines": {
     "node": ">=16.13"

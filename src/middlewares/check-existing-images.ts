@@ -1,20 +1,24 @@
-/* import dbConn from "../config/db.js";
+import { FastifyReply, FastifyRequest, PaymentInvoiceProcess } from "fastify";
 
-async function checkExistingImages(req, res, next) {
+/** Middleware that checks if the image requested for an invoice exists */
+export const checkExistingImages = async (
+  request: FastifyRequest<PaymentInvoiceProcess>,
+  reply: FastifyReply
+) => {
   try {
-    const existingImages =
-      await sql`SELECT COUNT(*) FROM "Image" WHERE uploaded_for = ${req.userUID}`;
+    const existingImages = await request.server.pg.query(
+      `SELECT COUNT(*)::int AS count FROM "Image" WHERE uploaded_for = '${request.userUID}'`
+    );
 
-    if (existingImages[0]["count(*)"] === "0") {
-      return res.status(409).json({
+    if (!existingImages.rowCount) {
+      reply.code(409).send({
+        success: false,
         msg: "Your account has no existing images. Contact your physician for more information.",
       });
     }
-
-    next();
   } catch (error) {
     console.log("checkExistingImages: ", error);
   }
-}
+};
 
-export default checkExistingImages; */
+export default checkExistingImages;

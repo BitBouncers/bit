@@ -23,6 +23,7 @@ import {
 
 describe("auth routes", () => {
   const authService: AuthService = new AuthService();
+
   describe("add patient from existing or as a new user", () => {
     let request: FastifyRequest<AuthAddPatient>;
     let reply: FastifyReply;

@@ -1,23 +1,24 @@
-/* import dbConn from "../config/db.js";
+import { FastifyReply, FastifyRequest, PaymentInvoiceProcess } from "fastify";
 
-async function checkImageHasInvoice(req, res, next) {
+/** Middleware that checks if the image requested for an opinion  has any x invoices */
+export const checkImageHasInvoice = async (
+  request: FastifyRequest<PaymentInvoiceProcess>,
+  reply: FastifyReply
+) => {
   try {
-    const result = await sql`
+    const result = await request.server.pg.query(
+      `
         SELECT
           COALESCE(inv.uid, 'No Invoice') as invoice_uid
         FROM
           "Image" i
         LEFT JOIN
-          "Invoice" inv ON i.uid = inv.image_uid AND inv.radiologist_uid = ${req.params.uid}
-        WHERE i.uid = ${req.body.image}`.catch((error) => {
-      console.log("checkImageHasInvoice: ", error);
-      res.json({ success: false });
-    });
+          "Invoice" inv ON i.uid = inv.image_uid AND inv.radiologist_uid = '${request.params.uid}'
+        WHERE i.uid = '${request.body.image}'`
+    );
 
-    if (result.count > 0 && result[0].invoice_uid === "No Invoice") {
-      next();
-    } else {
-      return res.status(409).json({
+    if (result.rowCount && result.rows[0].invoice_uid === "No invoice") {
+      return reply.code(409).send({
         success: false,
         msg: "Image already has an invoice for this radiologist.",
       });
@@ -25,6 +26,6 @@ async function checkImageHasInvoice(req, res, next) {
   } catch (error) {
     console.log("checkImageHasInvoice: ", error);
   }
-}
+};
 
-export default checkImageHasInvoice; */
+export default checkImageHasInvoice;

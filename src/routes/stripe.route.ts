@@ -1,4 +1,5 @@
 import { FastifyPluginCallback, FastifyRequest } from "fastify";
+import { notify } from "src/utils/notify";
 import Stripe from "stripe";
 import stripe, { stripeEventStore } from "../config/stripe";
 import { STRIPE_WEBHOOK_SECRET_KEY } from "../utils/environment";
@@ -61,7 +62,7 @@ const stripeRoutes: FastifyPluginCallback = (fastify, _, done) => {
     } catch (err: unknown) {
       if (err instanceof Error) {
         // console.log(`❌ Error message: ${err.message}`);
-        return reply.status(400).send(`Webhook Error: ${err.message}`);
+        return reply.code(400).send(`Webhook Error: ${err.message}`);
       }
     }
 
@@ -105,14 +106,17 @@ const stripeRoutes: FastifyPluginCallback = (fastify, _, done) => {
         break;
       case "invoice.paid":
         try {
-          /* sql`UPDATE Invoice SET paid = true WHERE uid = ${event.data.object.id}`;
-        notify(
-          event.data.object.metadata.radiologist,
-          event.data.object.metadata.patient,
-          `${event.data.object.customer_name} has paid for an analysis.`,
-          "/patients"
-        );
-        stripeEventStore.add(event.id); */
+          request.server.pg.query(
+            `UPDATE "Invoice" SET paid = true WHERE uid = '${event.data.object.id}'`
+          );
+
+          notify(request.server.pg.pool, {
+            sender: event.data.object.metadata!.radiologist,
+            recipient: event.data.object.metadata!.patient,
+            message: `${event.data.object.customer_name} has paid for an analysis.`,
+            to: "/patients",
+          });
+          stripeEventStore.add(event.id);
         } catch (error) {
           console.log("Error updating invoice: ", error);
         }
@@ -122,7 +126,9 @@ const stripeRoutes: FastifyPluginCallback = (fastify, _, done) => {
       case "invoice.updated":
         break;
       case "invoice.voided":
-        // sql`UPDATE Invoice SET paid = true WHERE uid = ${event.data.object.id}`;
+        request.server.pg.query(
+          `UPDATE "Invoice" SET paid = true WHERE uid = '${event.data.object.id}'`
+        );
         break;
       case "payment_method.attached":
         break;

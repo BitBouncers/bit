@@ -1,21 +1,24 @@
-/* import dbConn from "../config/db.js";
+import { FastifyReply, FastifyRequest, PaymentInvoiceProcess } from "fastify";
 
-async function checkUnpaidInvoices(req, res, next) {
+/** Middleware that checks if the user has any unpaid invoices */
+export const checkUnpaidInvoices = async (
+  request: FastifyRequest<PaymentInvoiceProcess>,
+  reply: FastifyReply
+) => {
   try {
-    const unpaidInvoice =
-      await sql`SELECT COUNT(*)::int as count FROM "Invoice" WHERE patient_uid = ${req.userUID} AND paid = false`;
+    const unpaidInvoice = await request.server.pg.query(
+      `SELECT COUNT(*)::int as count FROM "Invoice" WHERE patient_uid = '${request.userUID}' AND paid = false`
+    );
 
-    if (unpaidInvoice[0].count > 0) {
-      return res.status(409).json({
+    if (unpaidInvoice.rows[0].count > 0) {
+      return reply.code(409).send({
         success: false,
         msg: "You have unpaid invoices. Please pay or cancel them before requesting another opinion.",
       });
     }
-
-    next();
   } catch (error) {
     console.log("checkUnpaidInvoices: ", error);
   }
-}
+};
 
-export default checkUnpaidInvoices; */
+export default checkUnpaidInvoices;

@@ -19,13 +19,13 @@ describe("user route", () => {
     );
   });
 
-  test("error with malformed authorization headers", async () => {
+  test("error with jwt string passed", async () => {
     const response = await app.inject({
       url: "/api/user/me",
       headers: { Authorization: "Bea" },
     });
 
-    expect(response.json().error).toBe("Malformed authorization header.");
+    expect(response.json().error).toBe("There was an error with your request.");
   });
 
   test("second opinion radiologists", async () => {

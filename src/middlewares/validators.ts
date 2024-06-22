@@ -153,58 +153,6 @@ export const loginSchema = checkSchema(
   ["body"]
 );
 
-export const invoiceSchema = checkSchema({
-  uid: {
-    in: ["params"],
-    notEmpty: {
-      bail: true,
-      errorMessage: "Radiologist's uid is required",
-    },
-    checkUid: {
-      bail: true,
-      custom: (uid) => {
-        if (uid === "Select a radiologist") return Promise.reject();
-        else return Promise.resolve();
-      },
-      errorMessage: "Please select a radiologist",
-    },
-    isLength: {
-      bail: true,
-      options: { min: 28, max: 28 },
-      errorMessage: "Invalid radiologist's uid",
-    },
-  },
-  image: {
-    in: ["body"],
-    notEmpty: {
-      bail: true,
-      errorMessage: "Image uid is required",
-    },
-    checkUid: {
-      bail: true,
-      custom: checkImageExists,
-      errorMessage: "Image does not exist",
-    },
-  },
-});
-
-export const invoicesSchema = checkSchema(
-  {
-    userId: {
-      notEmpty: {
-        bail: true,
-        errorMessage: "User's uid is required",
-      },
-      isString: {
-        bail: true,
-        options: { min: 28, max: 28 },
-        errorMessage: "Invalid user's uid",
-      },
-    },
-  },
-  ["params"]
-);
-
 export const paySchema = checkSchema(
   {
     invoice: {
@@ -337,6 +285,75 @@ export const updateProfileSchema = checkSchema({
   },
 }); */
 
+export const invoiceSchema = {
+  body: {
+    type: "object",
+    properties: {
+      image: { type: "string" },
+    },
+    required: ["image"],
+  },
+  schema: {
+    params: {
+      type: "object",
+      properties: {
+        uid: { type: "string" },
+      },
+      required: ["uid"],
+    },
+    additionalProperties: false,
+  },
+  /* uid: {
+    in: ["params"],
+    notEmpty: {
+      bail: true,
+      errorMessage: "Radiologist's uid is required",
+    },
+    checkUid: {
+      bail: true,
+      custom: (uid) => {
+        if (uid === "Select a radiologist") return Promise.reject();
+        else return Promise.resolve();
+      },
+      errorMessage: "Please select a radiologist",
+    },
+    isLength: {
+      bail: true,
+      options: { min: 28, max: 28 },
+      errorMessage: "Invalid radiologist's uid",
+    },
+  },
+  image: {
+    in: ["body"],
+    notEmpty: {
+      bail: true,
+      errorMessage: "Image uid is required",
+    },
+    checkUid: {
+      bail: true,
+      custom: checkImageExists,
+      errorMessage: "Image does not exist",
+    },
+  }, */
+};
+
+export const invoicesSchema = {
+  schema: {
+    params: {
+      type: "object",
+      properties: {
+        userId: {
+          type: "string",
+          minLength: 28,
+          maxLength: 28,
+        },
+      },
+      required: ["userId"],
+    },
+  },
+  additionalProperties: false,
+};
+
 export const portalSchema = {
   schema: {
     body: {
@@ -348,42 +365,6 @@ export const portalSchema = {
         },
       },
       required: ["email"],
-    },
-  },
-  additionalProperties: false,
-};
-
-export const readNotificationSchema = {
-  schema: {
-    body: {
-      type: "object",
-      properties: {
-        read: {
-          type: "array",
-          items: {
-            type: "string",
-          },
-        },
-      },
-      required: ["read"],
-    },
-  },
-  additionalProperties: false,
-};
-
-export const readNotificationSchema = {
-  schema: {
-    body: {
-      type: "object",
-      properties: {
-        read: {
-          type: "array",
-          items: {
-            type: "string",
-          },
-        },
-      },
-      required: ["read"],
     },
   },
   additionalProperties: false,
