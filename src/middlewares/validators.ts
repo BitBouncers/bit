@@ -251,38 +251,6 @@ export const uploadImageSchema = checkSchema({
       errorMessage: "Invalid image url",
     },
   },
-});
-
-export const updateEmailSchema = checkSchema(
-  {
-    email: {
-      emailExists: {
-        bail: true,
-        custom: checkEmailExists,
-        errorMessage: "This email is already in use",
-      },
-      isEmail: {
-        trim: true,
-        errorMessage: "Invalid email",
-      },
-    },
-  },
-  ["body"]
-);
-
-export const updateProfileSchema = checkSchema({
-  profile_image_url: {
-    isString: {
-      bail: true,
-      options: { min: 0 },
-      errorMessage: "Invalid profile image url",
-    },
-    optional: {
-      options: {
-        values: "falsy",
-      },
-    },
-  },
 }); */
 
 export const invoiceSchema = {
@@ -457,8 +425,39 @@ export const updateImageNoteSchema = {
           format: "uuid",
         },
       },
+      required: ["note"],
     },
-    required: ["image_uid", "note"],
+  },
+  additionalProperties: false,
+};
+
+export const updateEmailSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        email: {
+          type: "string",
+          format: "email",
+        },
+      },
+      required: ["email"],
+    },
+  },
+  additionalProperties: false,
+};
+
+export const updateProfileSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        profile_image_url: {
+          type: "string",
+          minLength: 0,
+        },
+      },
+    },
   },
   additionalProperties: false,
 };

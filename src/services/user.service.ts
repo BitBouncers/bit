@@ -1,5 +1,14 @@
-import { FastifyReply, FastifyRequest, UserUIDParams } from "fastify";
+import {
+  FastifyReply,
+  FastifyRequest,
+  UpdateEmail,
+  UpdateProfile,
+  UserUIDParams,
+} from "fastify";
+import { FirebaseAuthError } from "firebase-admin/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import * as Pg from "pg";
+import { adminAuth, auth } from "src/config/firebase";
 
 type Role = "Patient" | "Physician" | "Radiologist" | "Admin";
 
@@ -32,6 +41,16 @@ interface IUserService {
 
   profile: (
     request: FastifyRequest<UserUIDParams>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  updateEmail: (
+    request: FastifyRequest<UpdateEmail>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  updateProfile: (
+    request: FastifyRequest<UpdateProfile>,
     reply: FastifyReply
   ) => Promise<void>;
 }
@@ -206,10 +225,108 @@ export default class UserService implements IUserService {
       })
       .catch((error) => {
         console.log("user.service.profile: ", error);
-        return reply.status(204).send({});
+        return reply.code(204).send({});
       });
 
     reply.send({ profile: results[0].rows[0], staff: results[1].rows });
+  };
+
+  updateEmail = async (
+    request: FastifyRequest<UpdateEmail>,
+    reply: FastifyReply
+  ) => {
+    const { email, password } = request.body;
+
+    if (!request.userUID) return reply.code(422).send({ success: false });
+
+    const currentUser = await adminAuth.getUser(request.userUID);
+
+    if (!currentUser.email) return reply.code(422).send({ success: false });
+
+    try {
+      // Reauthenticate the user before updating the email
+      await signInWithEmailAndPassword(auth, currentUser.email, password);
+
+      await adminAuth.updateUser(request.userUID, { email });
+
+      // Update the email in the database
+      await request.server.pg.query(
+        `
+        UPDATE "User"
+        SET email = $1
+        WHERE uid = $2
+        `,
+        [email, request.userUID]
+      );
+
+      reply.send({ success: true, msg: "Email updated successfully." });
+    } catch (error) {
+      console.log("user.service.updateNewEmail:", error);
+      if (error instanceof FirebaseAuthError)
+        if (error.code === "auth/invalid-login-credentials") {
+          return reply
+            .code(422)
+            .send({ success: false, errors: [{ msg: "Incorrect password" }] });
+        } else if (error.code === "auth/too-many-requests") {
+          return reply.code(422).send({
+            success: false,
+            errors: [{ msg: "Too many requests. Try again later." }],
+          });
+        } else {
+          reply.code(422).send({ success: false });
+        }
+    }
+  };
+
+  updateProfile = async (
+    request: FastifyRequest<UpdateProfile>,
+    reply: FastifyReply
+  ) => {
+    const enabled = request.body.enableRatingSystem ?? true;
+    const newBio = request.body.bio ?? "";
+    let profile_image_url,
+      bio: Pg.QueryResult<never> | string | null = null;
+
+    try {
+      await request.server.pg.transact(async (client) => {
+        const user = await client.query(
+          `
+        SELECT role
+        FROM "User"
+        WHERE uid = $1`,
+          [request.userUID]
+        );
+
+        profile_image_url = await client.query(
+          `
+        UPDATE "User"
+        SET profile_image_url = $1, allow_ratings = $2
+        WHERE uid = $3`,
+          [request.body.profile_image_url, enabled, request.userUID]
+        );
+
+        if (
+          user.rowCount &&
+          user.rowCount > 0 &&
+          user.rows[0].role !== "PATIENT"
+        ) {
+          bio = await request.server.pg.query(
+            `
+          INSERT INTO "StaffCredentials" (bio, uid)
+          VALUES($1, $2)
+          ON CONFLICT (uid) DO UPDATE SET bio = EXCLUDED.bio
+        `,
+            [newBio, request.userUID]
+          );
+        }
+        return [profile_image_url, bio];
+      });
+
+      reply.send({ success: true, data: { ...request.body } });
+    } catch (error) {
+      console.log("user.service.uploadImage: ", error);
+      reply.code(422).send({ success: false });
+    }
   };
 }
 
@@ -418,70 +535,6 @@ export default class UserService implements IUserService {
   }
 
   res.json({ success: true });
-} */
-
-/* export async function updateNewEmail(req, res) {
-  const { email, password } = req.body;
-
-  const currentUser = await adminAuth.getUser(req.userUID);
-
-  try {
-    // Reauthenticate the user before updating the email
-    await signInWithEmailAndPassword(auth, currentUser.email, password);
-
-    await adminAuth.updateUser(req.userUID, { email });
-
-    // Update the email in the database
-    await sql`UPDATE User SET email = ${email} WHERE uid = ${req.userUIDi}`.catch((error) => console.log(error));
-
-    res.json({ success: true, msg: "Email updated successfully." });
-  } catch (error) {
-    console.log("user.service.updateNewEmail:", error);
-    if (error.code === "auth/invalid-login-credentials") {
-      return res.status(422).json({ success: false, errors: [{ msg: "Incorrect password" }] });
-    } else if (error.code === "auth/too-many-requests") {
-      return res.status(422).json({
-        success: false,
-        errors: [{ msg: "Too many requests. Try again later." }],
-      });
-    } else {
-      res.status(422).json({ success: false });
-    }
-  }
-} */
-
-/* export async function updateProfile(req, res) {
-  const enabled = req.body.enableRatingSystem ?? true;
-  const newBio = req.body.bio ?? "";
-  let profile_image_url,
-    bio = null;
-
-  try {
-    await sql.begin(async (sql) => {
-      const user = await sql`
-        SELECT role
-        FROM "User"
-        WHERE uid = ${req.userUID}`;
-      profile_image_url = await sql`
-        UPDATE "User"
-        SET profile_image_url = ${req.body.profile_image_url}, allow_ratings = ${enabled}
-        WHERE uid = ${req.userUID}
-      `;
-      if (user.count > 0 && user[0].role !== "PATIENT") {
-        bio = await sql`
-          INSERT INTO "StaffCredentials" (bio, uid)
-          VALUES(${newBio}, ${req.userUID})
-          ON CONFLICT (uid) DO UPDATE SET bio = EXCLUDED.bio
-        `;
-      }
-      return [profile_image_url, bio];
-    });
-
-    res.json({ success: true, data: { ...req.body } });
-  } catch (error) {
-    console.log("user.service.uploadImage: ", error);
-    res.status(422).json({ success: false });
-  }
 } */
 
 const patientsAsRadiologistQuery = async (

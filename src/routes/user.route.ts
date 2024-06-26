@@ -6,6 +6,10 @@ import {
 import { isAuthenticated } from "src/middlewares/firebase-auth";
 import { isAuthorizedOrStaff } from "src/middlewares/isAuthorizedOrStaff";
 import { isStaff } from "src/middlewares/isStaff";
+import {
+  updateEmailSchema,
+  updateProfileSchema,
+} from "src/middlewares/validators";
 import { userService } from "src/services";
 
 const userRoutes: FastifyPluginCallback = (
@@ -28,10 +32,21 @@ const userRoutes: FastifyPluginCallback = (
     handler: userService.patients,
   });
 
-  fastify.get("/profile", {preHandler: [isAuthenticated], handler: userService.profile});
+  fastify.get("/profile", {
+    preHandler: [isAuthenticated],
+    handler: userService.profile,
+  });
 
-  // fastify.put( "/email", [isAuthenticated, updateEmailSchema, errors], userController.updateNewEmail);
-  // fastify.put( "/profile", [isAuthenticated, updateProfileSchema, errors], userController.updateProfile);
+  fastify.put("/email", {
+    ...updateEmailSchema,
+    preHandler: [isAuthenticated],
+    handler: userService.updateEmail,
+  });
+  fastify.put("/profile", {
+    ...updateProfileSchema,
+    preHandler: [isAuthenticated],
+    handler: userService.updateProfile,
+  });
 
   // fastify.post( "/rate", [isAuthenticated, rateRadiologistSchema, errors], userController.rateRadiologist);
   // fastify.post( "/upload-image", [isAuthenticated, isStaff, uploadImageSchema, errors], userController.uploadImage); // router.get("/radiologists", async (request, reply) => { reply.type("application/json").code(200); return { radiologists: [] }; });

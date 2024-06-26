@@ -102,4 +102,25 @@ declare module "fastify" {
       uid: string;
     };
   }
+
+  interface UpdateEmail extends RequestGenericInterface {
+    Body: {
+      email: string;
+      password;
+    }
+    Params: {
+      uid: string;
+    };
+  }
+
+  interface UpdateProfile extends RequestGenericInterface {
+    Body: {
+      bio: string | null | undefined;
+      enableRatingSystem: boolean;
+      profile_image_url: string | null | undefined;
+    };
+    Params: {
+      uid: string;
+    };
+  }
 }
