@@ -20,15 +20,15 @@ const userRoutes: FastifyPluginCallback = (
 
   fastify.get("/:uid/images", {
     preHandler: [isAuthenticated, isAuthorizedOrStaff],
-    handler: userService.getImages,
+    handler: userService.images,
   });
 
   fastify.get("/patients", {
     preHandler: [isAuthenticated, isStaff],
-    handler: userService.getPatients,
+    handler: userService.patients,
   });
 
-  // fastify.get("/profile", [isAuthenticated], userController.profile);
+  fastify.get("/profile", {preHandler: [isAuthenticated], handler: userService.profile});
 
   // fastify.put( "/email", [isAuthenticated, updateEmailSchema, errors], userController.updateNewEmail);
   // fastify.put( "/profile", [isAuthenticated, updateProfileSchema, errors], userController.updateProfile);
@@ -41,11 +41,11 @@ const userRoutes: FastifyPluginCallback = (
 
   fastify.get("/radiologists", {
     preHandler: [isAuthenticated],
-    handler: userService.getRadiologists,
+    handler: userService.radiologists,
   });
 
   fastify.get("/meet-our-radiologists", {
-    handler: userService.getMeetOurRadiologists,
+    handler: userService.meetOurRadiologists,
   });
 
   done();

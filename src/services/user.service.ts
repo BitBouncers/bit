@@ -10,22 +10,27 @@ type MeRole = {
 interface IUserService {
   me: (request: FastifyRequest, reply: FastifyReply) => Promise<MeRole>;
 
-  getImages: (
+  images: (
     request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => Promise<void>;
 
-  getRadiologists: (
+  radiologists: (
     request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => Promise<void>;
 
-  getMeetOurRadiologists: (
+  meetOurRadiologists: (
     request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => Promise<void>;
 
-  getPatients: (
+  patients: (
+    request: FastifyRequest<UserUIDParams>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  profile: (
     request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => Promise<void>;
@@ -54,7 +59,7 @@ export default class UserService implements IUserService {
     }
   };
 
-  getImages = async (
+  images = async (
     request: FastifyRequest<UserUIDParams>,
     reply: FastifyReply
   ) => {
@@ -103,7 +108,7 @@ export default class UserService implements IUserService {
     }
   };
 
-  getRadiologists = async (request: FastifyRequest, reply: FastifyReply) => {
+  radiologists = async (request: FastifyRequest, reply: FastifyReply) => {
     const result = await request.server.pg.query(`
       SELECT
         U.uid, U.title, U.first_name, U.last_name, U.email, U.profile_image_url,
@@ -123,7 +128,7 @@ export default class UserService implements IUserService {
     reply.send({ radiologists: result.rows });
   };
 
-  getMeetOurRadiologists = async (
+  meetOurRadiologists = async (
     request: FastifyRequest,
     reply: FastifyReply
   ) => {
@@ -146,7 +151,7 @@ export default class UserService implements IUserService {
     reply.send({ radiologists: result.rows });
   };
 
-  getPatients = async (request: FastifyRequest, reply: FastifyReply) => {
+  patients = async (request: FastifyRequest, reply: FastifyReply) => {
     const result = await request.server.pg
       .query(`SELECT role FROM "User" WHERE uid = '${request.userUID}';`)
       .then(async (result) => {
@@ -170,28 +175,43 @@ export default class UserService implements IUserService {
 
     reply.send({ patients: result });
   };
-}
 
-/* handler: async (request, reply) => {
-      const result = await fastify.db.execute(
-        sql`SELECT role FROM User WHERE uid = ${request.userUID}`
-      );
-      if (result.size === 1) {
-        reply.send({
-          role:
-            result.rows[0].role.charAt(0) +
-            result.rows[0].role.slice(1).toLowerCase(),
-        });
-      } else {
-        reply.send({ role: "Patient" });
-      }
-    }, */
-// import crypto from "crypto";
-/* import {
-  adminAuth,
-  auth,
-  signInWithEmailAndPassword,
-} from "../config/firebase"; */
+  profile = async (request: FastifyRequest, reply: FastifyReply) => {
+    const results = await request.server.pg
+      .transact(async (client) => {
+        const user = await client.query(
+          `SELECT
+          title, first_name, last_name, TO_CHAR(dob, 'MM-DD-YYYY') AS dob, email, profile_image_url, allow_ratings, SC.bio, SC.expertise, SC.years_of_exp
+        FROM "User" U
+        LEFT JOIN "StaffCredentials" SC ON U.uid = SC.uid
+        WHERE U.uid = $1`,
+          [request.userUID]
+        );
+        const staff = await client.query(
+          `SELECT
+        U.uid AS uid,
+        U.first_name AS first_name,
+        U.last_name AS last_name,
+        U.role AS role,
+        U.title AS title
+      FROM
+          "User" AS U
+      INNER JOIN
+          "PatientRelation" AS PR ON U.uid = PR.staff_uid
+      WHERE
+          PR.patient_uid = $1`,
+          [request.userUID]
+        );
+        return [user, staff];
+      })
+      .catch((error) => {
+        console.log("user.service.profile: ", error);
+        return reply.status(204).send({});
+      });
+
+    reply.send({ profile: results[0].rows[0], staff: results[1].rows });
+  };
+}
 
 /* export async function assignRadiologist(req, res) {
   await dbConn
@@ -368,44 +388,6 @@ export default class UserService implements IUserService {
     });
 
   res.json({ patients: result.rows });
-} */
-
-/* export async function profile(req, res) {
-  const results = await dbConn
-    .transaction(async (tx) => {
-      const user = await tx.execute(
-        "\
-        SELECT \
-          title, first_name, last_name, dob, email, profile_image_url, allow_ratings, SC.bio, SC.expertise, SC.years_of_exp \
-        FROM User U \
-        LEFT JOIN StaffCredentials SC ON U.uid = SC.uid \
-        WHERE U.uid = ?",
-        [req.userUID]
-      );
-      const staff = await tx.execute(
-        "\
-      SELECT \
-        U.uid AS uid, \
-        U.first_name AS first_name, \
-        U.last_name AS last_name, \
-        U.role AS role, \
-        U.title AS title \
-      FROM \
-          User AS U \
-      INNER JOIN \
-          PatientRelation AS PR ON U.uid = PR.staff_uid \
-      WHERE \
-          PR.patient_uid = ? ",
-        [req.userUID]
-      );
-      return [user, staff];
-    })
-    .catch((error) => {
-      console.log("user.service.profile: ", error);
-      res.status(204).json({});
-    });
-
-  res.json({ profile: results[0].rows[0], staff: results[1].rows });
 } */
 
 /* export async function uploadImage(req, res) {
