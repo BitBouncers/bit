@@ -1,6 +1,6 @@
 # Radiology Archive's Backend
 
-The backend of Radiology Archive, built on [Express.js](https://expressjs.com/) and utilizing various technologies like [Prisma](https://www.prisma.io/), [PlanetScale](https://planetscale.com/), [Firebase Auth & Storage](https://firebase.google.com/), and [Stripe](https://stripe.com/docs/development) — designed to manage and serve medical imaging data securely and handle user authentication and payment processing.
+The backend of Radiology Archive, built on [Fastify](https://fastify.dev/) and utilizing various technologies like [DrizzleORM](https://orm.drizzle.team/), [Supabase](https://supabase.com/), [Firebase Auth & Storage](https://firebase.google.com/), and [Stripe](https://stripe.com/docs/development) — designed to manage and serve medical imaging data securely and handle user authentication and payment processing.
 
 ## Documentation
 
@@ -11,21 +11,14 @@ See the [radiology archive API docs](https://databasekeepers.github.io/backend/)
 ```bash
 .
 ├── docs                        # Documentation for API
-├── prisma
-│   └── schema.prisma
+├── drizzle
+│   ├── migration sqls
+│   └── schema.ts
 ├── src
 │   ├── config                  # External services: (PlanetScale, Firebase, Stripe)
 │   │   ├── db.js
 │   │   ├── firebase.js
 │   │   └── stripe.js
-│   ├── controllers             # Binds routes and validate requests to service
-│   │   ├── auth.controller.js
-│   │   ├── hospital.controller.js
-│   │   ├── image.controller.js
-│   │   ├── payment.controller.js
-│   │   ├── notification.controller.js
-│   │   ├── user.controller.js
-│   │   └── index.js
 │   ├── middlewares
 │   │   ├── authorization.js                # Ensure user is permitted to access an endpoint
 │   │   ├── check-existing-images.js        # Ensure user has images before proceeding to transaction process
@@ -35,7 +28,7 @@ See the [radiology archive API docs](https://databasekeepers.github.io/backend/)
 │   │   ├── create-stripe-user.js           # Creates stripe customer upon given user
 │   │   ├── errors.js                       # Processes any errors from the route's schema
 │   │   ├── firebase-auth.js                # Ensure valid firebase token in request header
-│   │   └── validators.js                   # Contains schemas to be used in express.js routes
+│   │   └── validators.js                   # Contains schemas to be used in fastify routes
 │   ├── routes                              # Contains all route definitions
 │   │   ├── auth.route.js
 │   │   ├── hospital.route.js
@@ -43,25 +36,27 @@ See the [radiology archive API docs](https://databasekeepers.github.io/backend/)
 │   │   ├── payment.route.js
 │   │   ├── notification.route.js
 │   │   ├── stripe.route.js
-│   │   ├── user.route.js
-│   │   └── index.js
+│   │   └── user.route.js
 │   ├── services                # Employs logic to requests from controller
 │   │   ├── auth.service.js
 │   │   ├── hospital.service.js
 │   │   ├── image.service.js
 │   │   ├── payment.service.js
 │   │   ├── notification.service.js
-│   │   ├── user.service.js
-│   │   └── index.js
+│   │   └── user.service.js
 │   ├── utils                   # Snippets to be used throughout codebase
 │   │   └── environment.js      # Environment variables are loaded here and exported
-│   ├── app.js                  # Initialize express application and its dependencies
-│   └── index.js                # Entry point to start express application
+│   ├── app.js                  # Initialize fastify application and its dependencies
+│   └── index.js                # Entry point to start fastify application
+├── test
+├── .eslintrc.cjs
+├── drizzle.config.ts
+├── .env.example
 ├── README.md
 ├── package.json
 ├── package-lock.json
 ├── .prettierrc
-└── .env.example
+└── tsconfig.json
 
 ```
 
