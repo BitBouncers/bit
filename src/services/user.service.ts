@@ -1,7 +1,9 @@
 import {
+  AssignRadiologistParams,
   FastifyReply,
   FastifyRequest,
   RateRadiologist,
+  RemoveRadiologistParams,
   UpdateEmail,
   UpdateProfile,
   UploadImage,
@@ -21,6 +23,11 @@ type MeRole = {
 
 interface IUserService {
   me: (request: FastifyRequest, reply: FastifyReply) => Promise<MeRole>;
+
+  assignRadiologist: (
+    request: FastifyRequest<AssignRadiologistParams>,
+    reply: FastifyReply
+  ) => Promise<void>;
 
   images: (
     request: FastifyRequest<UserUIDParams>,
@@ -52,6 +59,11 @@ interface IUserService {
     reply: FastifyReply
   ) => Promise<void>;
 
+  removeRadiologist: (
+    request: FastifyRequest<RemoveRadiologistParams>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
   updateEmail: (
     request: FastifyRequest<UpdateEmail>,
     reply: FastifyReply
@@ -69,6 +81,38 @@ interface IUserService {
 }
 
 export default class UserService implements IUserService {
+  assignRadiologist = async (
+    request: FastifyRequest<AssignRadiologistParams>,
+    reply: FastifyReply
+  ) => {
+    await request.server.pg
+      .query(
+        `
+        INSERT INTO "PatientRelation" (patient_uid, staff_uid)
+        VALUES ($1, $2)
+      `,
+        [request.userUID, request.params.uid]
+      )
+      .then((result) => {
+        if (result.rowCount && result.rowCount > 0) {
+          reply.send({ success: true });
+        } else {
+          reply.send({ success: false });
+        }
+      })
+      .catch((error: unknown) => {
+        if ((error as DatabaseError).code?.includes("duplicate")) {
+          reply.send({
+            success: false,
+            message:
+              "You have already assigned this radiologist to your account.",
+          });
+        } else {
+          reply.send({ success: false });
+        }
+      });
+  };
+
   me = async (request: FastifyRequest, reply: FastifyReply) => {
     if (!request.userUID) {
       return reply
@@ -330,6 +374,34 @@ export default class UserService implements IUserService {
     }
   };
 
+  removeRadiologist = async (
+    request: FastifyRequest<RemoveRadiologistParams>,
+    reply: FastifyReply
+  ) => {
+    await request.server.pg
+      .query(
+        `
+        DELETE FROM "PatientRelation"
+        WHERE patient_uid = $1 AND staff_uid = $2
+        `,
+        [request.userUID, request.params.uid]
+      )
+      .then((result) => {
+        if (result.rowCount && result.rowCount > 0) {
+          reply.send({ success: true });
+        } else {
+          reply.send({
+            success: false,
+            msg: "Specified radiologist not found.",
+          });
+        }
+      })
+      .catch((error) => {
+        console.log("user.service.removeRadiologist: ", error.body);
+        reply.send({ success: false });
+      });
+  };
+
   updateEmail = async (
     request: FastifyRequest<UpdateEmail>,
     reply: FastifyReply
@@ -516,137 +588,6 @@ export default class UserService implements IUserService {
     }
   };
 }
-
-/* export async function assignRadiologist(req, res) {
-  await dbConn
-    .execute(
-      "INSERT INTO PatientRelation (patient_uid, staff_uid) VALUES (?, ?)",
-      [req.userUID, req.params.uid]
-    )
-    .then((result) => {
-      if (result.count > 0) {
-        res.json({ success: true });
-      } else {
-        res.json({ success: false });
-      }
-    })
-    .catch((error) => {
-      console.log("user.service.assignRadiologist: ", error.detail);
-      if (error.detail.includes("duplicate")) {
-        return res.json({
-          success: false,
-          message: "You have already assigned this radiologist to your account.",
-        });
-      }
-      res.json({ success: false });
-    });
-} */
-
-/* export async function removeRadiologist(req, res) {
-  await dbConn
-    .execute(
-      "DELETE FROM PatientRelation WHERE patient_uid = ? AND staff_uid = ?",
-      [req.userUID, req.params.uid]
-    )
-    .then((result) => {
-      if (result.count > 0) {
-        res.json({ success: true });
-      } else {
-        res.json({ success: false, msg: "Specified radiologist not found." });
-      }
-    })
-    .catch((error) => {
-      console.log("user.service.removeRadiologist: ", error.body);
-      res.json({ success: false });
-    });
-} */
-
-/* export async function images(req, res) {
-  const result = await dbConn
-    .execute(
-      "\
-      SELECT \
-        I.uid, I.url, I.createdAt, U.first_name, U.last_name, \
-        UA_uploaded.title as uploadedBy_title, \
-        UA_uploaded.first_name AS uploadedBy_first_name, \
-        UA_uploaded.last_name AS uploadedBy_last_name, \
-        IF(COUNT(INN.note) > 0, \
-          JSON_ARRAYAGG( \
-            JSON_OBJECT( \
-              'uid', INN.author_uid, \
-              'note', INN.note, \
-              'full_name', CONCAT(UA.title, ' ', UA.first_name, ' ', UA.last_name), \
-              'role', UA.role, \
-              'recommendation', \
-              CASE \
-                WHEN URA.uid IS NOT NULL THEN CONCAT(URA.first_name, ' ', URA.last_name) \
-                ELSE NULL \
-              END \
-            ) \
-          ), \
-          JSON_ARRAY() \
-        ) AS authors \
-      FROM User U \
-      JOIN Image I ON U.uid = I.uploaded_for \
-      LEFT JOIN User UA_uploaded ON I.uploaded_by = UA_uploaded.uid \
-      LEFT JOIN ( \
-        SELECT INN.uid, INN.note, INN.image_uid, INN.author_uid, INN.createdAt, INN.recommend_uid \
-        FROM ImageNote INN \
-        JOIN User UA ON INN.author_uid = UA.uid \
-        WHERE UA.role IN ('PHYSICIAN', 'RADIOLOGIST') \
-      ) AS INN ON I.uid = INN.image_uid \
-      LEFT JOIN User URA ON INN.recommend_uid = URA.uid AND URA.role = 'RADIOLOGIST' \
-      LEFT JOIN User UA ON INN.author_uid = UA.uid \
-      WHERE U.role = 'PATIENT' AND U.uid = ? \
-      GROUP BY I.uid, I.url",
-      [req.params.uid]
-    )
-    .catch((error) => {
-      console.log("user.service.images: ", error);
-    }
-  );
-
-  res.json({ images: result.rows });
-} */
-
-/* export async function me(req, res) {
-  try {
-    const result = await sql`SELECT role FROM "User" WHERE uid = ${req.userUID}`;
-
-    if (result.count === 1) {
-      res.json({
-        role: result[0].role.charAt(0) + result[0].role.slice(1).toLowerCase(),
-      });
-    } else {
-      res.json({ role: "Patient" });
-    }
-  } catch (error) {
-    console.log("user.service.me: ", error);
-    res.json({ role: "Patient" });
-  }
-} */
-
-/* export async function patients(req, res) {
-  const result = await dbConn
-    .execute("SELECT role FROM User WHERE uid = ?", [req.userUID])
-    .then(async (result) => {
-      if (result.count === 1 && result[0].role === "RADIOLOGIST") {
-        return await patientsAsRadiologistQuery(req.userUID).catch((error) => {
-          console.log("user.service.patientsAsRadiologistQuery: ", error);
-        });
-      } else {
-        return await patientsAsPhysicianQuery(req.userUID).catch((error) => {
-          console.log("user.service.patientsAsPhysicianQuery: ", error);
-        });
-      }
-    })
-    .catch((error) => {
-      console.log("user.service.patients: ", error);
-      res.json({ patients: [] });
-    });
-
-  res.json({ patients: result.rows });
-} */
 
 const patientsAsRadiologistQuery = async (
   pg: Pool,

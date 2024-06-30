@@ -11,6 +11,12 @@ declare module "fastify" {
     params?: { uid: string };
   }
 
+  interface AssignRadiologistParams extends RequestGenericInterface {
+    Params: {
+      uid: string;
+    };
+  }
+
   interface AuthAddPatient extends RequestGenericInterface {
     Body: {
       email: string;
@@ -102,6 +108,12 @@ declare module "fastify" {
       uid: string;
       rating: number;
       comment: string;
+    };
+  }
+
+  interface RemoveRadiologistParams extends RequestGenericInterface {
+    Params: {
+      uid: string;
     };
   }
 

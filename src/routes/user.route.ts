@@ -45,6 +45,7 @@ const userRoutes: FastifyPluginCallback = (
     preHandler: [isAuthenticated],
     handler: userService.updateEmail,
   });
+
   fastify.put("/profile", {
     ...updateProfileSchema,
     preHandler: [isAuthenticated],
@@ -56,14 +57,22 @@ const userRoutes: FastifyPluginCallback = (
     preHandler: [isAuthenticated, checkRateRadiologists],
     handler: userService.rateRadiologist,
   });
+
   fastify.post("/upload-image", {
     ...uploadImageSchema,
     preHandler: [isAuthenticated, isAuthorizedOrStaff],
     handler: userService.uploadImage,
   });
 
-  // fastify.post( "/:uid/assign/radiologist", [isAuthenticated, isAuthorized], userController.assignRadiologist);
-  // fastify.delete( "/:uid/remove/radiologist", [isAuthenticated, isAuthorized], userController.removeRadiologist);
+  fastify.post("/:uid/assign/radiologist", {
+    preHandler: [isAuthenticated, isAuthorizedOrStaff],
+    handler: userService.assignRadiologist,
+  });
+
+  fastify.delete("/:uid/remove/radiologist", {
+    preHandler: [isAuthenticated, isAuthorizedOrStaff],
+    handler: userService.removeRadiologist,
+  });
 
   fastify.get("/radiologists", {
     preHandler: [isAuthenticated],
