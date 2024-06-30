@@ -4,6 +4,7 @@ import {
   RateRadiologist,
   UpdateEmail,
   UpdateProfile,
+  UploadImage,
   UserUIDParams,
 } from "fastify";
 import { FirebaseAuthError } from "firebase-admin/auth";
@@ -53,6 +54,11 @@ interface IUserService {
 
   updateEmail: (
     request: FastifyRequest<UpdateEmail>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  uploadImage: (
+    request: FastifyRequest<UploadImage>,
     reply: FastifyReply
   ) => Promise<void>;
 
@@ -371,6 +377,94 @@ export default class UserService implements IUserService {
     }
   };
 
+  uploadImage = async (
+    request: FastifyRequest<UploadImage>,
+    reply: FastifyReply
+  ) => {
+    if (!request.userUID) return reply.code(422).send({ success: false });
+
+    const patient = await request.server.pg.query(
+      `
+        SELECT uid
+        FROM "User" WHERE uid = $1
+      `,
+      [request.body.patient]
+    );
+
+    if (!patient.rowCount) {
+      return reply.code(400).send({
+        errors: [{ msg: "Patient does not exist" }],
+      });
+    }
+
+    const radiologist = await request.server.pg.query(
+      `
+        SELECT uid
+        FROM "User"
+        WHERE uid = $1 AND role = 'RADIOLOGIST'
+      `,
+      [request.body.recommend]
+    );
+
+    if (!radiologist.rowCount) {
+      return reply.code(400).send({
+        errors: [{ msg: "An error occurred with the selected radiologist" }],
+      });
+    }
+
+    try {
+      const uuid = crypto.randomUUID();
+      const results = await request.server.pg.transact(async (client) => {
+        const image = await client.query(
+          `
+          INSERT INTO "Image" (uid, uploaded_by, uploaded_for, url)
+          VALUES($1, $2, $3, $4)
+          ON CONFLICT (uid) DO NOTHING
+          `,
+          [uuid, request.userUID, request.body.patient, request.body.url]
+        );
+
+        const imageNote = await client.query(
+          `
+          INSERT INTO "ImageNote" (image_uid, author_uid, note, recommend_uid)
+          VALUES($1, $2, $3, $4)
+          `,
+          [
+            uuid,
+            request.userUID,
+            request.body.notes ?? "",
+            request.body.recommend,
+          ]
+        );
+
+        return [image.rowCount, imageNote.rowCount];
+      });
+
+      if (results[0] && results[1] && results[0] > 0 && results[1] > 0) {
+        notify(request.server.pg.pool, {
+          recipient: request.body.patient,
+          sender: request.userUID,
+          message: "You have a new image from your physician.",
+          to: "/imagelibrary",
+        });
+
+        if (!request.body.notes) {
+          notify(request.server.pg.pool, {
+            recipient: request.userUID,
+            sender: request.body.patient,
+            message: "Don't forget to add your notes to your patient's image.",
+            to: "/patients",
+          });
+        }
+      }
+    } catch (error) {
+      console.log("user.service.uploadImage: ", error);
+      reply.code(422).send({ success: false });
+    }
+
+    reply.send({ success: true });
+  };
+
   updateProfile = async (
     request: FastifyRequest<UpdateProfile>,
     reply: FastifyReply
@@ -552,36 +646,6 @@ export default class UserService implements IUserService {
     });
 
   res.json({ patients: result.rows });
-} */
-
-/* export async function uploadImage(req, res) {
-  try {
-    const uuid = crypto.randomUUID();
-    const results = await sql.begin(async (sql) => {
-      const image = await sql`
-        INSERT INTO "Image" (uid, uploaded_by, uploaded_for, url)
-        VALUES(${uuid}, ${req.userUID}, ${req.body.patient}, ${req.body.url})
-        ON CONFLICT (uid) DO NOTHING
-      `;
-      const imageNote = await sql`
-        INSERT INTO "ImageNote" (image_uid, author_uid, note, recommend_uid)
-        VALUES(${uuid}, ${req.userUID}, ${req.body.notes ?? ""}, ${req.body.recommendation})
-      `;
-      return [image.count, imageNote.count];
-    });
-    if (results.length === 2 && results[0] > 0 && results[1] > 0) {
-      notify(req.body.patient, req.userUID, "You have a new image from your physician.", "/imagelibrary");
-
-      if (!req.body.notes) {
-        notify(req.userUID, req.body.patient, "Don't forget to add your notes to your patient's image.", "/patients");
-      }
-    }
-  } catch (error) {
-    console.log("user.service.uploadImage: ", error);
-    res.status(422).json({ success: false });
-  }
-
-  res.json({ success: true });
 } */
 
 const patientsAsRadiologistQuery = async (

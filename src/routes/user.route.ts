@@ -11,6 +11,7 @@ import {
   rateRadiologistSchema,
   updateEmailSchema,
   updateProfileSchema,
+  uploadImageSchema,
 } from "src/middlewares/validators";
 import { userService } from "src/services";
 
@@ -55,7 +56,11 @@ const userRoutes: FastifyPluginCallback = (
     preHandler: [isAuthenticated, checkRateRadiologists],
     handler: userService.rateRadiologist,
   });
-  // fastify.post( "/upload-image", [isAuthenticated, isStaff, uploadImageSchema, errors], userController.uploadImage); // router.get("/radiologists", async (request, reply) => { reply.type("application/json").code(200); return { radiologists: [] }; });
+  fastify.post("/upload-image", {
+    ...uploadImageSchema,
+    preHandler: [isAuthenticated, isAuthorizedOrStaff],
+    handler: userService.uploadImage,
+  });
 
   // fastify.post( "/:uid/assign/radiologist", [isAuthenticated, isAuthorized], userController.assignRadiologist);
   // fastify.delete( "/:uid/remove/radiologist", [isAuthenticated, isAuthorized], userController.removeRadiologist);

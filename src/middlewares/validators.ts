@@ -1,4 +1,4 @@
-/* import { checkSchema } from "express-validator";
+/* import { checkSchema } from "express-validator";valid
 import dbConn from "../config/db.js";
 import { adminAuth } from "../config/firebase.js";
 
@@ -128,51 +128,7 @@ export const paySchema = checkSchema(
     },
   },
   ["body"]
-);
-
-export const uploadImageSchema = checkSchema({
-  patient: {
-    notEmpty: {
-      bail: true,
-      errorMessage: "Patient's uid is required",
-    },
-    patientExists: {
-      bail: true,
-      custom: checkPatientExists,
-      errorMessage: "Patient does not exist",
-    },
-  },
-  recommendation: {
-    optional: {
-      options: {
-        values: "null",
-      },
-    },
-    radiologistExists: {
-      bail: true,
-      custom: checkRadiologistExists,
-      errorMessage: "Radiologist does not exist",
-    },
-    isRadiologist: {
-      bail: true,
-      custom: checkRoleIsRadiologist,
-      errorMessage: "User is not a radiologist",
-    },
-  },
-  url: {
-    notEmpty: {
-      bail: true,
-      errorMessage: "Image url is required",
-    },
-    isURL: {
-      bail: true,
-      options: {
-        host_whitelist: ["firebasestorage.googleapis.com"],
-      },
-      errorMessage: "Invalid image url",
-    },
-  },
-}); */
+); */
 
 export const invoiceSchema = {
   body: {
@@ -190,9 +146,18 @@ export const invoiceSchema = {
       },
       required: ["uid"],
     },
+    body: {
+      type: "object",
+      properties: {
+        image: { type: "string" },
+      },
+      required: ["image"],
+    },
     additionalProperties: false,
   },
-  /* uid: {
+};
+
+/* uid: {
     in: ["params"],
     notEmpty: {
       bail: true,
@@ -223,8 +188,7 @@ export const invoiceSchema = {
       custom: checkImageExists,
       errorMessage: "Image does not exist",
     },
-  }, */
-};
+  } */
 
 export const invoicesSchema = {
   schema: {
@@ -381,6 +345,31 @@ export const updateEmailSchema = {
         },
       },
       required: ["email"],
+    },
+  },
+  additionalProperties: false,
+};
+
+export const uploadImageSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        notes: {
+          type: "string",
+        },
+        patient: {
+          type: "string",
+        },
+        recommendation: {
+          type: "string",
+        },
+        url: {
+          type: "string",
+          format: "uri",
+        },
+      },
+      required: ["patient", "url"],
     },
   },
   additionalProperties: false,

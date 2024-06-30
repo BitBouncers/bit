@@ -13,11 +13,14 @@ export async function notify(
 ) {
   try {
     const now = new Date();
-    await pg.query(`
+    await pg.query(
+      `
       INSERT INTO
       "Notification" (recipient_uid, sender_uid, message, "createdAt", timestamp, "to")
-      VALUES (${recipient}, ${sender}, ${message || ""}, ${now}, ${now}, ${to || null})
-    `);
+      VALUES ($1, $2, $3, $4, $5, $6)
+      `,
+      [recipient, sender, message || "", now, now, to || null]
+    );
   } catch (error) {
     console.log("notification.service.notify: ", error);
   }

@@ -121,6 +121,15 @@ declare module "fastify" {
     };
   }
 
+  interface UploadImage extends RequestGenericInterface {
+    Body: {
+      notes: string;
+      patient: string;
+      url: string;
+      recommend: string;
+    };
+  }
+
   interface UpdateProfile extends RequestGenericInterface {
     Body: {
       bio: string | null | undefined;
