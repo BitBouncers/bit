@@ -1,14 +1,16 @@
 import {
   FastifyReply,
   FastifyRequest,
+  RateRadiologist,
   UpdateEmail,
   UpdateProfile,
   UserUIDParams,
 } from "fastify";
 import { FirebaseAuthError } from "firebase-admin/auth";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import * as Pg from "pg";
+import { DatabaseError, Pool, QueryResult } from "pg";
 import { adminAuth, auth } from "src/config/firebase";
+import { notify } from "src/utils/notify";
 
 type Role = "Patient" | "Physician" | "Radiologist" | "Admin";
 
@@ -41,6 +43,11 @@ interface IUserService {
 
   profile: (
     request: FastifyRequest<UserUIDParams>,
+    reply: FastifyReply
+  ) => Promise<void>;
+
+  rateRadiologist: (
+    request: FastifyRequest<RateRadiologist>,
     reply: FastifyReply
   ) => Promise<void>;
 
@@ -231,6 +238,92 @@ export default class UserService implements IUserService {
     reply.send({ profile: results[0].rows[0], staff: results[1].rows });
   };
 
+  rateRadiologist = async (
+    request: FastifyRequest<RateRadiologist>,
+    reply: FastifyReply
+  ) => {
+    const { uid, rating, comment } = request.body;
+    const now = new Date();
+
+    try {
+      const rating_uid = crypto.randomUUID();
+      await request.server.pg
+        .query(
+          `
+          INSERT INTO
+            "Rating" (uid, comment, rating, rated_uid, user_uid, "createdAt", "editedAt")
+          VALUES($1, $2, $3, $4, $5, $6, $7)
+          `,
+          [rating_uid, comment || "", rating, uid, request.userUID, now, now]
+        )
+
+        .then((result) => {
+          if (result.rowCount && result.rowCount > 0) {
+            reply.send({
+              success: true,
+              msg: "Rating submitted successfully.",
+            });
+            notify(request.server.pg.pool, {
+              recipient: uid,
+              sender: request.userUID!,
+              message: "A patient has rated your service.",
+            });
+          } else {
+            reply.send({ success: false });
+          }
+        });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if ((error as DatabaseError).code === "23505") {
+          await request.server.pg
+            .query(
+              `
+              SELECT rating
+              FROM "Rating"
+              WHERE rated_uid = $1 AND user_uid = $2
+              `,
+              [uid, request.userUID]
+            )
+            .then(async (result) => {
+              if (result.rows[0].rating === rating) {
+                return reply.send({
+                  success: true,
+                  msg: "Same rating already exists.",
+                });
+              }
+
+              await request.server.pg
+                .query(
+                  `
+                    UPDATE "Rating"
+                    SET comment = $1, rating = $2
+                    WHERE rated_uid = $3 AND user_uid = $4
+                  `,
+                  [comment || "", rating, uid, request.userUID]
+                )
+                .then((result) => {
+                  if (result.rowCount && result.rowCount > 0) {
+                    reply.send({
+                      success: true,
+                      msg: "Rating updated successfully.",
+                    });
+                    notify(request.server.pg.pool, {
+                      recipient: uid,
+                      sender: request.userUID!,
+                      message: "A patient has updated their rating.",
+                    });
+                  }
+                })
+                .catch((error) => {
+                  console.log("user.service.rateRadiologist: ", error);
+                  reply.send({ success: false });
+                });
+            });
+        }
+      }
+    }
+  };
+
   updateEmail = async (
     request: FastifyRequest<UpdateEmail>,
     reply: FastifyReply
@@ -285,7 +378,7 @@ export default class UserService implements IUserService {
     const enabled = request.body.enableRatingSystem ?? true;
     const newBio = request.body.bio ?? "";
     let profile_image_url,
-      bio: Pg.QueryResult<never> | string | null = null;
+      bio: QueryResult<never> | string | null = null;
 
     try {
       await request.server.pg.transact(async (client) => {
@@ -353,52 +446,6 @@ export default class UserService implements IUserService {
       }
       res.json({ success: false });
     });
-} */
-
-/* export async function rateRadiologist(req, res) {
-  const { uid, rating, comment } = req.body;
-  const now = new Date();
-
-  try {
-    const rating_uid = crypto.randomUUID();
-    await sql`INSERT INTO "Rating" (uid, comment, rating, rated_uid, user_uid, "createdAt", "editedAt")
-      VALUES(${rating_uid}, ${comment || ""}, ${rating}, ${uid}, ${req.userUID}, ${now}, ${now})`.then((result) => {
-      if (result.count > 0) {
-        res.json({ success: true, msg: "Rating submitted successfully." });
-        notify(uid, req.userUID, "A patient has rated your service.");
-      } else {
-        res.json({ success: false });
-      }
-    });
-  } catch (error) {
-    if (error.detail.includes("already exists")) {
-      await sql`SELECT rating FROM "Rating" WHERE rated_uid = ${uid} AND user_uid = ${req.userUID}`.then(
-        async (result) => {
-          if (result[0].rating === rating) {
-            return res.json({
-              success: true,
-              msg: "Same rating already exists.",
-            });
-          }
-
-          await sql`UPDATE "Rating" SET comment = ${comment || ""}, rating = ${rating} WHERE rated_uid = ${uid} AND user_uid = ${req.userUID}`
-            .then((result) => {
-              if (result.count > 0) {
-                res.json({
-                  success: true,
-                  msg: "Rating updated successfully.",
-                });
-                notify(uid, req.userUID, "A patient has updated their rating.");
-              }
-            })
-            .catch((error) => {
-              console.log("user.service.rateRadiologist: ", error);
-              res.json({ success: false });
-            });
-        }
-      );
-    }
-  }
 } */
 
 /* export async function removeRadiologist(req, res) {
@@ -538,7 +585,7 @@ export default class UserService implements IUserService {
 } */
 
 const patientsAsRadiologistQuery = async (
-  pg: Pg.Pool,
+  pg: Pool,
   uid: string | undefined
 ) => {
   const radiologists =
@@ -587,10 +634,7 @@ const patientsAsRadiologistQuery = async (
   return radiologists.rows;
 };
 
-const patientsAsPhysicianQuery = async (
-  pg: Pg.Pool,
-  uid: string | undefined
-) => {
+const patientsAsPhysicianQuery = async (pg: Pool, uid: string | undefined) => {
   const radiologists =
     await pg.query(`SELECT U.uid, TO_CHAR(U.dob, 'MM-DD-YYYY') as dob, U.first_name, U.last_name, U.email, U.profile_image_url,
       COALESCE(

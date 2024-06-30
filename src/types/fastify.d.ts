@@ -97,6 +97,14 @@ declare module "fastify" {
     };
   }
 
+  interface RateRadiologist extends RequestGenericInterface {
+    Body: {
+      uid: string;
+      rating: number;
+      comment: string;
+    };
+  }
+
   interface UserUIDParams extends RequestGenericInterface {
     Params: {
       uid: string;
@@ -106,8 +114,8 @@ declare module "fastify" {
   interface UpdateEmail extends RequestGenericInterface {
     Body: {
       email: string;
-      password;
-    }
+      password: string;
+    };
     Params: {
       uid: string;
     };

@@ -46,51 +46,6 @@ async function checkPatientExists(uid, { req }) {
     });
 }
 
-
-async function checkRadiologistExists(uid, { req }) {
-  await sql`SELECT uid FROM "User" WHERE uid = ${uid}`
-    .then((result) => {
-      if (result.count > 0) {
-        return Promise.resolve(req);
-      }
-      return Promise.reject();
-    })
-    .catch((error) => {
-      console.log(error.code, error.message);
-      return Promise.reject();
-    });
-}
-
-async function checkRatingsEnabled(uid) {
-  const result = await sql`SELECT
-      uid,
-      CASE
-        WHEN allow_ratings = true THEN 1
-        ELSE 0
-      END AS allow_ratings
-    FROM "User" WHERE uid = ${uid}`;
-  if (result.count === 0) return Promise.reject();
-  if (result[0].allow_ratings === 1) {
-    return Promise.resolve();
-  } else {
-    return Promise.reject();
-  }
-}
-
-async function checkRoleIsRadiologist(uid, { req }) {
-  await sql`SELECT uid FROM "User" WHERE uid = ${uid} AND role = 'RADIOLOGIST'`
-    .then((result) => {
-      if (result.count > 0) {
-        return Promise.resolve(req);
-      }
-      return Promise.reject();
-    })
-    .catch((error) => {
-      console.log(error.code, error.message);
-      return Promise.reject();
-    });
-}
-
 async function checkInvoiceExists(uid, { req }) {
   await sql
     .execute("SELECT uid, patient_uid, amount FROM Invoice WHERE uid = ? AND patient_uid = ?", [uid, req.userUID])
@@ -169,40 +124,6 @@ export const paySchema = checkSchema(
         bail: true,
         custom: checkInvoicePaid,
         errorMessage: "Invoice has already been paid",
-      },
-    },
-  },
-  ["body"]
-);
-
-export const rateRadiologistSchema = checkSchema(
-  {
-    uid: {
-      notEmpty: {
-        bail: true,
-        errorMessage: "Radiologist's uid is required",
-      },
-      radiologistExists: {
-        bail: true,
-        custom: checkRadiologistExists,
-        errorMessage: "Radiologist does not exist",
-      },
-      isRadiologist: {
-        bail: true,
-        custom: checkRoleIsRadiologist,
-        errorMessage: "User is not a radiologist",
-      },
-      ratingsEnabled: {
-        bail: true,
-        custom: checkRatingsEnabled,
-        errorMessage: "Radiologist currently has ratings disabled",
-      },
-    },
-    rating: {
-      isInt: {
-        bail: true,
-        options: { min: 1, max: 5 },
-        errorMessage: "Invalid rating",
       },
     },
   },
@@ -336,6 +257,24 @@ export const portalSchema = {
     },
   },
   additionalProperties: false,
+};
+
+export const rateRadiologistSchema = {
+  schema: {
+    body: {
+      type: "object",
+      properties: {
+        uid: {
+          type: "string",
+        },
+        rating: {
+          type: "number",
+          minimum: 1,
+          maximum: 5,
+        },
+      },
+    },
+  },
 };
 
 export const readNotificationSchema = {
