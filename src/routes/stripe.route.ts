@@ -86,18 +86,19 @@ const stripeRoutes: FastifyPluginCallback = (fastify, _, done) => {
             .query(
               `
             INSERT INTO "Invoice" (uid, url, image_uid, patient_uid, radiologist_uid, amount, paid, "createdAt")
-            VALUES(
-              ${event.data.object.id},
-              ${event.data.object.hosted_invoice_url as string},
-              ${event.data.object.metadata?.image as string},
-              ${event.data.object.metadata?.patient as string},
-              ${event.data.object.metadata?.radiologist as string},
-              ${event.data.object.total / 100},
-              ${event.data.object.paid},
-              ${new Date(event.data.object.created * 1000)}
-            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (uid) DO NOTHING
-          `
+          `,
+              [
+                event.data.object.id,
+                event.data.object.hosted_invoice_url as string,
+                event.data.object.metadata?.image as string,
+                event.data.object.metadata?.patient as string,
+                event.data.object.metadata?.radiologist as string,
+                event.data.object.total / 100,
+                event.data.object.paid,
+                new Date(event.data.object.created * 1000),
+              ]
             )
             .catch((error) => console.log("Error inserting invoice: ", error));
         }
